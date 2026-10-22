@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -89,7 +88,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 
 <body class="admin-page">
 
-<nav class="navbar navbar-dark admin-nav">
+<nav class="navbar navbar-dark admin-nav sticky-top shadow">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
             <img
@@ -103,10 +102,10 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
             <span>Philippines' Best Coffee Admin</span>
         </a>
 
-        <div class="d-flex gap-2">
-            <a href="dashboard.php" class="btn btn-sm btn-outline-light">
-                Dashboard
-            </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="navbar-text d-none d-md-inline">
+                Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
+            </span>
             <a href="logout.php" class="btn btn-sm btn-outline-light">
                 Log Out
             </a>
