@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -131,7 +130,7 @@ $formAction = $editProduct ? 'edit' : 'add';
 </head>
 
 <body class="admin-page">
-    <nav class="navbar navbar-dark admin-nav">
+    <nav class="navbar navbar-dark admin-nav sticky-top shadow">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
                 <img src="../Bestcoffee.jpg"
@@ -139,6 +138,10 @@ $formAction = $editProduct ? 'edit' : 'add';
                      style="width:38px;height:38px;object-fit:contain;border-radius:50%;background:#fff">
                 <span>Philippines' Best Coffee Admin</span>
             </a>
+            <div class="d-flex align-items-center gap-2">
+                <span class="navbar-text d-none d-md-inline">
+                Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
+            </span>
             <a href="logout.php" class="btn btn-sm btn-outline-light">Log out</a>
         </div>
     </nav>
