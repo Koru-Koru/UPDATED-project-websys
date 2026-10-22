@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -111,7 +110,7 @@ $customers = $conn
 </head>
 <body class="admin-page">
 
-<nav class="navbar navbar-dark admin-nav">
+<nav class="navbar navbar-dark admin-nav sticky-top shadow">
     <div class="container">
         <div class="d-flex align-items-center gap-2">
             <img
