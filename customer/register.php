@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
 
@@ -28,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!preg_match('/^[0-9]{11}$/', $phone)) {
-        $errors[] = 'Please enter a valid phone number containing exactly 11 digits.';
+        $errors[] = 'Phone number must contain exactly 11 digits.';
     }
 
     if (strlen($password) < 8) {
@@ -127,7 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="account-body">
 
 <div class="container py-5">
-    <div class="card account-card shadow-sm border-0 p-4 mx-auto" style="max-width: 560px;">
+    <div class="card account-card shadow-sm border-0 p-4 mx-auto"
+         style="max-width: 560px;">
 
         <div class="text-center mb-4">
             <a href="../index.php">
@@ -142,7 +142,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Create Your Account
             </h1>
 
-            <a href="../index.php" class="text-decoration-none btn btn-outline-coffee">
+            <a href="../index.php"
+               class="text-decoration-none btn btn-outline-coffee">
                 ← Back to Website
             </a>
         </div>
@@ -200,13 +201,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     pattern="[0-9]{11}"
                     value="<?= h($phone) ?>"
                     placeholder="09XXXXXXXXX"
-                    title="Enter exactly 11 digits."
+                    title="Phone number must contain exactly 11 digits."
                     autocomplete="tel"
                     oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);"
                     required
                 >
                 <div class="form-text">
-                    Enter your 11-digit mobile number (e.g., 09171234567).
+                    Enter exactly 11 digits (e.g., 09171234567).
                 </div>
             </div>
 
