@@ -1,3 +1,4 @@
+
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
 
@@ -24,6 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Please enter a valid email address.';
+    }
+
+    if (!preg_match('/^[0-9]{11}$/', $phone)) {
+        $errors[] = 'Please enter a valid phone number containing exactly 11 digits.';
     }
 
     if (strlen($password) < 8) {
@@ -189,10 +194,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     id="phone"
                     name="phone"
                     class="form-control"
-                    maxlength="30"
+                    maxlength="11"
+                    minlength="11"
+                    inputmode="numeric"
+                    pattern="[0-9]{11}"
                     value="<?= h($phone) ?>"
+                    placeholder="09XXXXXXXXX"
+                    title="Enter exactly 11 digits."
                     autocomplete="tel"
+                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);"
+                    required
                 >
+                <div class="form-text">
+                    Enter your 11-digit mobile number (e.g., 09171234567).
+                </div>
             </div>
 
             <div class="mb-3">
