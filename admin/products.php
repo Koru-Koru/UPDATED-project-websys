@@ -39,7 +39,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price === false ||
         $price === null ||
         $price < 0 ||
-        ($image !== '' && !filter_var($image, FILTER_VALIDATE_URL))
+        (
+            $image !== '' &&
+            !filter_var($image, FILTER_VALIDATE_URL) &&
+            !preg_match(
+                '~^assets/(?:[A-Za-z0-9 _-]+/)*[A-Za-z0-9 _-]+\.(?:jpe?g|png|webp|avif)$~i',
+                $image
+            )
+        )
     ) {
         set_flash('Please enter valid product details.', 'danger');
         header('Location: products.php');
@@ -199,9 +206,9 @@ $formAction = $editProduct ? 'edit' : 'add';
                     </div>
 
                     <div class="col-12">
-                        <label for="image_url" class="form-label">Image URL</label>
-                        <input id="image_url" class="form-control" type="url" name="image_url"
-                               placeholder="https://example.com/image.jpg"
+                        <label for="image_url" class="form-label">Image URL or asset path</label>
+                        <input id="image_url" class="form-control" type="text" name="image_url"
+                               placeholder="assets/Coffee/americano.jpg or https://example.com/image.jpg"
                                value="<?= h($editProduct['image_url'] ?? '') ?>">
                     </div>
 

@@ -2,7 +2,6 @@ $(function () {
     const $slides = $('.slide');
     let slideIndex = 0;
     let cart = [];
-    let lastReceipt = '';
 
     try {
         const saved = localStorage.getItem('phbestcoffee-cart');
@@ -20,8 +19,51 @@ $(function () {
         } catch (error) {}
     };
 
-    const itemCount = () => cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-    const subtotal = () => cart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+    const itemCount = () => cart.reduce((sum, item) => sum + item.quantity, 0);
+    const subtotalCents = () => cart.reduce(
+        (sum, item) => sum + Math.round(item.price * 100) * item.quantity,
+        0
+    );
+    const subtotal = () => subtotalCents() / 100;
+
+    function cartIsValid() {
+        const seenIds = new Set();
+
+        return cart.length > 0 && cart.length <= 50 && cart.every(function (item) {
+            const id = Number(item.id);
+            const priceCents = Number(item.price) * 100;
+
+            if (
+                !Number.isSafeInteger(id) || id < 1 ||
+                !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50 ||
+                typeof item.name !== 'string' || item.name.trim() === '' ||
+                !Number.isFinite(priceCents) || !Number.isSafeInteger(Math.round(priceCents)) ||
+                Math.abs(priceCents - Math.round(priceCents)) > 0.0001 ||
+                item.price < 0 || seenIds.has(id)
+            ) {
+                return false;
+            }
+
+            seenIds.add(id);
+            return true;
+        });
+    }
+
+    if (cart.length && !cartIsValid()) {
+        cart = [];
+        saveCart();
+        alert('Your saved cart contained invalid items or quantities and was cleared. Please add the products again.');
+    }
+
+    function inputAmountCents(value) {
+        const text = String(value).trim();
+        if (!/^\d+(?:\.\d{1,2})?$/.test(text)) return null;
+
+        const amount = Number(text);
+        if (!Number.isFinite(amount) || amount > 99999999.99) return null;
+
+        return Math.round(amount * 100);
+    }
 
     function showSlide(index) {
         $slides.removeClass('active').eq(index).addClass('active');
@@ -78,11 +120,16 @@ $(function () {
 
                 $('<button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Increase quantity">+</button>')
                     .on('click', function () {
-                        item.quantity = Math.min(999, item.quantity + 1);
+                        if (item.quantity >= 50) {
+                            alert('A maximum of 50 units is allowed per product.');
+                            return;
+                        }
+                        item.quantity += 1;
                         saveCart();
                         renderCart();
                         updateCount();
                     })
+                    .prop('disabled', item.quantity >= 50)
                     .appendTo($actions);
 
                 $('<button type="button" class="btn btn-sm btn-outline-danger">Remove</button>')
@@ -108,12 +155,12 @@ $(function () {
 
     $('.quantity-plus').on('click', function () {
         const $input = $(this).siblings('.menu-quantity-input');
-        $input.val(Math.min(99, (parseInt($input.val(), 10) || 1) + 1));
+        $input.val(Math.min(50, (parseInt($input.val(), 10) || 1) + 1));
     });
 
     $('.menu-quantity-input').on('change', function () {
-        const quantity = parseInt($(this).val(), 10);
-        $(this).val(Number.isFinite(quantity) ? Math.min(99, Math.max(1, quantity)) : 1);
+        const quantity = Number($(this).val());
+        $(this).val(Number.isInteger(quantity) ? Math.min(50, Math.max(1, quantity)) : 1);
     });
 
     $('.add-cart').on('click', function () {
@@ -128,12 +175,32 @@ $(function () {
         const name = String($button.data('name'));
         const price = Number($button.data('price'));
         const $quantityInput = $button.closest('.product-card').find('.menu-quantity-input');
-        const quantity = Math.min(99, Math.max(1, parseInt($quantityInput.val(), 10) || 1));
+        const rawQuantity = Number($quantityInput.val());
 
+        if (
+            !Number.isSafeInteger(id) || id < 1 ||
+            !Number.isFinite(price) || price < 0 ||
+            !Number.isInteger(rawQuantity) || rawQuantity < 1 || rawQuantity > 50
+        ) {
+            alert('Enter a whole-number quantity from 1 to 50.');
+            $quantityInput.trigger('focus');
+            return;
+        }
+
+        if (cart.length >= 50 && !cart.some(item => Number(item.id) === id)) {
+            alert('Your cart can contain up to 50 different products.');
+            return;
+        }
+
+        const quantity = rawQuantity;
         const found = cart.find(item => Number(item.id) === id);
 
         if (found) {
-            found.quantity = Math.min(999, found.quantity + quantity);
+            if (found.quantity + quantity > 50) {
+                alert('A maximum of 50 units is allowed per product.');
+                return;
+            }
+            found.quantity += quantity;
         } else {
             cart.push({ id, name, price, quantity });
         }
@@ -155,13 +222,16 @@ $(function () {
     });
 
     function totalsNow() {
-        const sub = subtotal();
-        const discount = $('#senior-pwd').is(':checked') ? sub * 0.20 : 0;
+        const subCents = subtotalCents();
+        const discountCents = $('#senior-pwd').is(':checked')
+            ? Math.round(subCents * 0.20)
+            : 0;
+        const totalCents = subCents - discountCents;
 
         return {
-            sub: Number(sub.toFixed(2)),
-            discount: Number(discount.toFixed(2)),
-            total: Number((sub - discount).toFixed(2))
+            sub: subCents / 100,
+            discount: discountCents / 100,
+            total: totalCents / 100
         };
     }
 
@@ -192,8 +262,8 @@ $(function () {
     }
 
     $('#checkout-btn').on('click', function () {
-        if (!cart.length) {
-            alert('Your cart is empty!');
+        if (!cartIsValid()) {
+            alert(cart.length ? 'Your cart has invalid items or quantities. Remove them and try again.' : 'Your cart is empty!');
             return;
         }
 
@@ -208,12 +278,12 @@ $(function () {
 
     $('#cash-amount').on('input', function () {
         const value = $(this).val();
-        const cash = Number(value);
+        const cashCents = inputAmountCents(value);
         const total = totalsNow().total;
 
         $('#change-display').text(
-            value !== '' && Number.isFinite(cash) && cash >= total
-                ? 'Change: ' + peso(cash - total)
+            value !== '' && cashCents !== null && cashCents >= Math.round(total * 100)
+                ? 'Change: ' + peso((cashCents - Math.round(total * 100)) / 100)
                 : ''
         );
     });
@@ -223,45 +293,46 @@ $(function () {
 
         if ($button.prop('disabled')) return;
 
-        if (!cart.length) {
-            alert('Your cart is empty!');
+        if (!cartIsValid()) {
+            alert(cart.length ? 'Your cart has invalid items or quantities. Review your cart and try again.' : 'Your cart is empty!');
             return;
         }
 
         const totals = updateReceiptTotal();
         const rawCash = $('#cash-amount').val();
-        const cash = Number(rawCash);
+        const cashCents = inputAmountCents(rawCash);
 
-        if (rawCash === '' || !Number.isFinite(cash) || cash <= 0) {
-            alert('Please enter a valid cash amount.');
+        if (cashCents === null || cashCents < 1) {
+            alert('Enter a valid cash amount with no more than two decimal places.');
             return;
         }
 
-        if (cash < totals.total) {
+        if (cashCents < Math.round(totals.total * 100)) {
             alert('Insufficient cash. Please enter an amount equal to or greater than the total.');
             return;
         }
 
-        const change = Number((cash - totals.total).toFixed(2));
+        const cash = cashCents / 100;
+        const change = (cashCents - Math.round(totals.total * 100)) / 100;
 
         $button.prop('disabled', true).text('Processing...');
 
         $.ajax({
-    url: 'orders/create.php',
-    method: 'POST',
-    contentType: 'application/json; charset=utf-8',
-    dataType: 'json',
-    data: JSON.stringify({
-        items: cart.map(item => ({
-            id: Number(item.id || 0),
-            quantity: Number(item.quantity)
-        })),
-        subtotal: totals.sub,
-        discount: totals.discount,
-        total: totals.total,
-        cash_received: cash
-    })
-})
+            url: 'orders/create.php',
+            method: 'POST',
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            data: JSON.stringify({
+                items: cart.map(item => ({
+                    id: Number(item.id),
+                    quantity: item.quantity
+                })),
+                subtotal: totals.sub,
+                discount: totals.discount,
+                total: totals.total,
+                cash_received: cash
+            })
+        })
         .done(function (savedOrder) {
             if (!savedOrder || !savedOrder.ok || !savedOrder.order_id) {
                 alert(savedOrder?.message || 'The order could not be completed.');
@@ -291,72 +362,74 @@ $(function () {
     });
 
     function completeOrder(orderId, totals, cash, change) {
-        const receipt = [
-            "Philippines' Best Coffee",
-            'Receipt - Order #' + orderId,
-            '--------------------------------',
-            ...cart.map(item =>
-                item.name + ' × ' + item.quantity + ' - ' +
-                peso(item.price * item.quantity)
-            ),
-            '--------------------------------',
-            'Subtotal: ' + peso(totals.sub)
-        ];
-
-        if (totals.discount > 0) {
-            receipt.push('Senior/PWD Discount (20%): -' + peso(totals.discount));
-        }
-
-        receipt.push(
-            'Total: ' + peso(totals.total),
-            'Cash: ' + peso(cash),
-            'Change: ' + peso(change),
-            'Thank you for your purchase!'
-        );
-
-        lastReceipt = receipt.join('\n');
-
         const $summary = $('#confirmation-body').empty();
+        const $receipt = $('<section class="receipt-preview"></section>');
+        const $watermark = $('<img class="receipt-watermark" alt="" aria-hidden="true">')
+            .attr('src', new URL('Bestcoffee.jpg', window.location.href).href);
+        const $content = $('<div class="receipt-preview-content"></div>');
+        const $brand = $('<header class="receipt-brand"></header>');
 
-        $('<p class="text-success fw-semibold"></p>')
-            .text('Your order #' + orderId + ' has been saved to your account.')
-            .appendTo($summary);
+        $('<img class="receipt-brand-logo" alt="Philippines’ Best Coffee logo">')
+            .attr('src', new URL('Bestcoffee.jpg', window.location.href).href)
+            .appendTo($brand);
+        $('<h3 class="title-font"></h3>')
+            .text("Philippines' Best Coffee")
+            .appendTo($brand);
+        $('<p></p>').text('Brewed with love · Made to share').appendTo($brand);
 
+        const $meta = $('<div class="receipt-meta"></div>');
+        $('<div><span>Order</span></div>')
+            .append($('<strong></strong>').text('#' + orderId))
+            .appendTo($meta);
+        $('<div class="text-end"><span>Date</span></div>')
+            .append($('<strong></strong>').text(new Date().toLocaleString()))
+            .appendTo($meta);
+
+        const $items = $('<div class="receipt-preview-items"></div>');
         cart.forEach(function (item) {
-            const $row = $('<div class="d-flex justify-content-between gap-3 mb-2"></div>');
+            const $row = $('<div class="receipt-preview-item"></div>');
+            const $details = $('<div class="receipt-item-details"></div>');
 
+            $('<strong></strong>').text(item.name).appendTo($details);
             $('<span></span>')
-                .text(item.name + ' × ' + item.quantity)
-                .appendTo($row);
-
-            $('<span></span>')
+                .text(item.quantity + ' × ' + peso(item.price))
+                .appendTo($details);
+            $('<strong class="receipt-item-total"></strong>')
                 .text(peso(item.price * item.quantity))
                 .appendTo($row);
-
-            $summary.append($row);
+            $row.prepend($details).appendTo($items);
         });
 
-        $('<hr>').appendTo($summary);
+        const $totals = $('<div class="receipt-preview-totals"></div>');
+        const appendTotal = function (label, amount, className) {
+            const $row = $('<div class="receipt-total-row"></div>');
+            if (className) $row.addClass(className);
+            $('<span></span>').text(label).appendTo($row);
+            $('<strong></strong>').text(amount).appendTo($row);
+            $row.appendTo($totals);
+        };
 
-        [
-            ['Subtotal', totals.sub],
-            ['Senior/PWD Discount', -totals.discount],
-            ['Total', totals.total],
-            ['Cash', cash],
-            ['Change', change]
-        ].forEach(function (entry) {
-            if (entry[0] === 'Senior/PWD Discount' && !totals.discount) return;
+        appendTotal('Subtotal', peso(totals.sub));
+        if (totals.discount > 0) {
+            appendTotal('Senior / PWD discount', '−' + peso(totals.discount), 'receipt-discount');
+        }
+        appendTotal('Total', peso(totals.total), 'receipt-grand-total');
+        appendTotal('Cash received', peso(cash));
+        appendTotal('Change', peso(change));
 
-            const $row = $('<div class="d-flex justify-content-between gap-3 mb-1"></div>');
+        $content.append($brand, $meta, $items, $totals);
+        $('<p class="receipt-thanks"></p>')
+            .text('Thank you for stopping by!')
+            .appendTo($content);
+        $('<p class="receipt-footer-note"></p>')
+            .text('We hope to see you again soon')
+            .appendTo($content);
+        $receipt.append($watermark, $content);
 
-            $('<span></span>').text(entry[0]).appendTo($row);
-
-            $('<span></span>')
-                .text((entry[1] < 0 ? '-' : '') + peso(Math.abs(entry[1])))
-                .appendTo($row);
-
-            $summary.append($row);
-        });
+        $('<p class="text-success small text-center fw-semibold mb-3"></p>')
+            .text('Your order has been saved to your account.')
+            .appendTo($summary);
+        $summary.append($receipt);
 
         cart = [];
         saveCart();
@@ -367,6 +440,9 @@ $(function () {
         $('#senior-pwd').prop('checked', false);
         $('#change-display').empty();
         $('#confirmation-modal').fadeIn(150);
+        window.setTimeout(function () {
+            window.print();
+        }, 500);
     }
 
     $('#cancel-receipt-btn').on('click', function () {
@@ -378,45 +454,25 @@ $(function () {
     });
 
     $('#print-receipt-btn').on('click', function () {
-        const receiptWindow = window.open('', '_blank');
+        window.print();
+    });
 
-        if (!receiptWindow) {
-            alert(lastReceipt);
-            return;
+    window.addEventListener('beforeprint', function () {
+        const receipt = document.querySelector('.receipt-preview');
+        if (!receipt) return;
+
+        receipt.style.zoom = '';
+        const printableHeight = 1000;
+        const receiptHeight = receipt.getBoundingClientRect().height;
+
+        if (receiptHeight > printableHeight) {
+            receipt.style.zoom = String(printableHeight / receiptHeight);
         }
+    });
 
-        const safeText = lastReceipt
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-
-        const receiptContent = `<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Receipt</title>
-    <style>
-        body {
-            font: 14px Arial, sans-serif;
-            max-width: 380px;
-            margin: 25px auto;
-            white-space: pre-line;
-        }
-        h1 {
-            font-size: 18px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Philippines' Best Coffee</h1>
-    ${safeText.replace(/^Philippines' Best Coffee\n/, '')}
-</body>
-</html>`;
-
-        receiptWindow.document.write(receiptContent);
-        receiptWindow.document.close();
-        receiptWindow.focus();
-        receiptWindow.print();
+    window.addEventListener('afterprint', function () {
+        const receipt = document.querySelector('.receipt-preview');
+        if (receipt) receipt.style.zoom = '';
     });
 
     $('.cart-modal').on('click', function (event) {

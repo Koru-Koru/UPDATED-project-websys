@@ -20,7 +20,7 @@ function render_products(array $items): void {
         echo '<p class="menu-price">₱' . number_format((float)$product['price'], 2) . '</p>';
         echo '<div class="menu-quantity d-flex align-items-center justify-content-center gap-2 mb-3 mt-auto">';
         echo '<button type="button" class="btn btn-outline-secondary quantity-minus" aria-label="Decrease ' . h($product['name']) . ' quantity"' . (!$available ? ' disabled' : '') . '>−</button>';
-        echo '<input class="form-control text-center menu-quantity-input" type="number" min="1" max="99" value="1" aria-label="Quantity for ' . h($product['name']) . '" style="max-width:70px"' . (!$available ? ' disabled' : '') . '>';
+        echo '<input class="form-control text-center menu-quantity-input" type="number" min="1" max="50" step="1" value="1" aria-label="Quantity for ' . h($product['name']) . '" style="max-width:70px"' . (!$available ? ' disabled' : '') . '>';
         echo '<button type="button" class="btn btn-outline-secondary quantity-plus" aria-label="Increase ' . h($product['name']) . ' quantity"' . (!$available ? ' disabled' : '') . '>+</button></div>';
         echo '<button class="add-cart btn btn-coffee w-100" data-id="' . (int)$product['product_id'] . '" data-name="' . h($product['name']) . '" data-price="' . h($product['price']) . '" data-available="' . ($available ? 'true' : 'false') . '"' . (!$available ? ' disabled' : '') . '>' . ($available ? 'Add to Cart' : 'Not Available') . '</button>';
         echo '</div></div>';
@@ -37,7 +37,7 @@ function render_products(array $items): void {
   
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/phbestcoffee.css">
+  <link rel="stylesheet" href="assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/assets/phbestcoffee.css') ?>">
 </head>
 <body class="site-body">
 
@@ -163,7 +163,7 @@ function render_products(array $items): void {
 
       <div id="cash-input-section" class="mb-4 text-start">
         <label for="cash-amount" class="form-label fw-semibold d-block mb-2">Enter Cash Received (₱)</label>
-        <input type="number" id="cash-amount" class="form-control" placeholder="Enter cash received (₱)" min="0" step="0.01">
+        <input type="number" id="cash-amount" class="form-control" placeholder="Enter cash received (₱)" min="0.01" step="0.01">
         <p id="change-display" class="text-success fw-semibold mt-2"></p>
       </div>
 
@@ -188,6 +188,6 @@ function render_products(array $items): void {
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="assets/phbestcoffee.js"></script>
+  <script src="assets/phbestcoffee.js?v=<?= filemtime(__DIR__ . '/assets/phbestcoffee.js') ?>"></script>
 </body>
 </html>

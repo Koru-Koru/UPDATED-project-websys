@@ -389,6 +389,7 @@ body.account-body {
 }
 
 .product-card {
+    min-width: 0;
     overflow: hidden;
     border: 0;
     border-radius: 1rem;
@@ -402,8 +403,10 @@ body.account-body {
 }
 
 .product-image {
+    display: block;
     width: 100%;
     height: 230px;
+    background: #f5f0e9;
     object-fit: cover;
 }
 
@@ -465,6 +468,266 @@ body.account-body {
 #receipt-items {
     max-height: 45vh;
     overflow-y: auto;
+}
+
+.receipt-preview {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    width: min(100%, 440px);
+    margin: 0 auto;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: #fffdfa;
+    box-shadow: 0 .75rem 2rem rgba(60, 29, 18, .1);
+}
+
+.receipt-watermark {
+    position: absolute;
+    z-index: 0;
+    top: 50%;
+    left: 50%;
+    width: min(70%, 260px);
+    aspect-ratio: 1;
+    object-fit: contain;
+    opacity: .11;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.receipt-preview-content {
+    position: relative;
+    z-index: 1;
+}
+
+.receipt-brand {
+    padding-bottom: 1rem;
+    border-bottom: 2px dashed #dccbb9;
+    text-align: center;
+}
+
+.receipt-brand-logo {
+    width: 64px;
+    height: 64px;
+    margin-bottom: .5rem;
+    border: 3px solid #f0e5d8;
+    border-radius: 50%;
+    background: #fff;
+    object-fit: cover;
+}
+
+.receipt-brand h3 {
+    margin: 0;
+    color: var(--coffee-dark);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.receipt-brand p,
+.receipt-meta span,
+.receipt-item-details span,
+.receipt-footer-note {
+    color: #806c5b;
+    font-size: .75rem;
+}
+
+.receipt-brand p {
+    margin: .4rem 0 0;
+    letter-spacing: .06em;
+}
+
+.receipt-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    color: var(--text);
+}
+
+.receipt-meta > div {
+    display: grid;
+    gap: .2rem;
+}
+
+.receipt-meta strong {
+    font-size: .85rem;
+}
+
+.receipt-preview-items {
+    border-top: 1px solid var(--border);
+}
+
+.receipt-preview-item {
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .75rem 0;
+}
+
+.receipt-preview-item + .receipt-preview-item {
+    border-top: 1px solid rgba(234, 223, 211, .7);
+}
+
+.receipt-item-details {
+    display: grid;
+    gap: .25rem;
+}
+
+.receipt-item-details strong,
+.receipt-item-total {
+    overflow-wrap: anywhere;
+    font-size: .85rem;
+}
+
+.receipt-item-details span {
+    font-size: .75rem;
+}
+
+.receipt-item-total {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.receipt-preview-totals {
+    display: grid;
+    gap: .25rem;
+    padding-top: .75rem;
+    border-top: 2px dashed #dccbb9;
+}
+
+.receipt-total-row {
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+    color: #6d5949;
+    font-size: .85rem;
+}
+
+.receipt-total-row strong {
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.receipt-total-row.receipt-discount,
+.receipt-total-row.receipt-discount strong {
+    color: #39704b;
+}
+
+.receipt-total-row.receipt-grand-total {
+    align-items: center;
+    margin: .4rem 0;
+    padding: .75rem;
+    border-radius: .6rem;
+    background: #f3ece3;
+    color: var(--coffee-dark);
+    font-size: .95rem;
+}
+
+.receipt-total-row.receipt-grand-total strong {
+    color: var(--accent);
+    font-size: 1.1rem;
+}
+
+.receipt-thanks {
+    margin: 1.25rem 0 .25rem;
+    color: var(--coffee);
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-style: italic;
+    text-align: center;
+}
+
+.receipt-footer-note {
+    margin: 0;
+    letter-spacing: .08em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+@page {
+    size: A4 portrait;
+    margin: 8mm;
+}
+
+@media print {
+    html,
+    body {
+        display: block !important;
+        width: 100%;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+    }
+
+    body > * {
+        display: none !important;
+    }
+
+    #confirmation-modal {
+        position: static !important;
+        display: block !important;
+        overflow: visible !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+
+    #confirmation-modal > .cart-content {
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+    }
+
+    #confirmation-title,
+    #confirmation-body > .text-success,
+    #confirmation-modal .d-flex.justify-content-end {
+        display: none !important;
+    }
+
+    #confirmation-body {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .receipt-preview {
+        display: block !important;
+        width: 100% !important;
+        max-width: 440px !important;
+        margin: 0 auto !important;
+        break-inside: avoid-page;
+        page-break-inside: avoid;
+        break-after: avoid-page;
+        page-break-after: avoid;
+        border: 1px solid #e8ded3 !important;
+        box-shadow: none !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .receipt-preview-item,
+    .receipt-preview-totals,
+    .receipt-thanks,
+    .receipt-footer-note {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .receipt-watermark {
+        opacity: .11 !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
 }
 
 /* ==================== FOOTER AND ANIMATION ==================== */
@@ -575,9 +838,14 @@ body.account-body {
 }
 
 /* ==================== RESPONSIVE LAYOUT ==================== */
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
     .product-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767.98px) {
+    .product-grid {
         gap: 1rem;
     }
 
@@ -624,4 +892,3 @@ body.account-body {
         transition-duration: .01ms !important;
     }
 }
-

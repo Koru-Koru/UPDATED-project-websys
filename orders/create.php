@@ -10,6 +10,37 @@ function respond(array $data, int $status = 200): void
     exit;
 }
 
+function submitted_amount_to_cents($value): ?int
+{
+    if (!is_int($value) && !is_float($value)) {
+        return null;
+    }
+
+    $amount = (float)$value;
+    if (!is_finite($amount) || $amount < 0 || $amount > 99999999.99) {
+        return null;
+    }
+
+    $scaled = $amount * 100;
+    $cents = (int)round($scaled);
+
+    return abs($scaled - $cents) < 0.0001 ? $cents : null;
+}
+
+function database_amount_to_cents($value): ?int
+{
+    if (
+        !is_string($value) ||
+        !preg_match('/^\\d{1,8}(?:\\.\\d{1,2})?$/D', $value)
+    ) {
+        return null;
+    }
+
+    [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+
+    return ((int)$whole * 100) + (int)str_pad($fraction, 2, '0');
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     respond(['ok' => false, 'message' => 'Method not allowed.'], 405);
@@ -29,19 +60,17 @@ if (!is_array($data)) {
 }
 
 $items = $data['items'] ?? [];
-$cash = filter_var($data['cash_received'] ?? null, FILTER_VALIDATE_FLOAT);
-$submittedTotal = filter_var($data['total'] ?? null, FILTER_VALIDATE_FLOAT);
-$submittedDiscount = filter_var($data['discount'] ?? 0, FILTER_VALIDATE_FLOAT);
+$cashCents = submitted_amount_to_cents($data['cash_received'] ?? null);
+$submittedSubtotalCents = submitted_amount_to_cents($data['subtotal'] ?? null);
+$submittedTotalCents = submitted_amount_to_cents($data['total'] ?? null);
+$submittedDiscountCents = submitted_amount_to_cents($data['discount'] ?? null);
 
 if (
     !is_array($items) || count($items) < 1 || count($items) > 50 ||
-    $cash === false || $cash === null ||
-    $submittedTotal === false || $submittedTotal === null ||
-    $submittedDiscount === false || $submittedDiscount === null ||
-    !is_finite((float)$cash) ||
-    !is_finite((float)$submittedTotal) ||
-    !is_finite((float)$submittedDiscount) ||
-    $cash < 0 || $submittedTotal < 0 || $submittedDiscount < 0
+    $cashCents === null || $cashCents < 1 ||
+    $submittedSubtotalCents === null ||
+    $submittedTotalCents === null ||
+    $submittedDiscountCents === null
 ) {
     respond(['ok' => false, 'message' => 'Order details are invalid.'], 400);
 }
@@ -50,7 +79,8 @@ try {
     $conn->begin_transaction();
 
     $cleanItems = [];
-    $realSubtotal = 0;
+    $realSubtotalCents = 0;
+    $seenProductIds = [];
 
     $productStmt = $conn->prepare(
         'SELECT product_id, name, price, is_available
@@ -65,16 +95,25 @@ try {
             throw new RuntimeException('Invalid cart item.');
         }
 
-        $productId = filter_var($item['id'] ?? null, FILTER_VALIDATE_INT);
-        $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
+        $productId = $item['id'] ?? null;
+        $quantity = $item['quantity'] ?? null;
 
         if (
-            $productId === false || $productId === null || $productId < 1 ||
-            $quantity === false || $quantity === null ||
+            !is_int($productId) || $productId < 1 ||
+            !is_int($quantity) ||
             $quantity < 1 || $quantity > 50
         ) {
-            throw new RuntimeException('One of the cart items is invalid.');
+            throw new RuntimeException(
+                'Each cart quantity must be a whole number from 1 to 50.'
+            );
         }
+
+        if (isset($seenProductIds[$productId])) {
+            throw new RuntimeException(
+                'The cart contains a duplicate product. Please review your cart.'
+            );
+        }
+        $seenProductIds[$productId] = true;
 
         $productStmt->bind_param('i', $productId);
         $productStmt->execute();
@@ -86,35 +125,57 @@ try {
             );
         }
 
-        $price = (float)$product['price'];
-        $lineTotal = round($price * $quantity, 2);
-        $realSubtotal = round($realSubtotal + $lineTotal, 2);
+        $priceCents = database_amount_to_cents($product['price']);
+        if ($priceCents === null) {
+            throw new RuntimeException(
+                'A product has an invalid price. Please contact the shop.'
+            );
+        }
+
+        $lineTotalCents = $priceCents * $quantity;
+        $realSubtotalCents += $lineTotalCents;
+        if ($realSubtotalCents > 9999999999) {
+            throw new RuntimeException('The order total is too large.');
+        }
 
         $cleanItems[] = [
             'id' => (int)$product['product_id'],
             'name' => $product['name'],
-            'price' => $price,
+            'price' => $priceCents / 100,
             'quantity' => $quantity,
-            'line_total' => $lineTotal
+            'line_total' => $lineTotalCents / 100
         ];
     }
 
-    $maxDiscount = round($realSubtotal * 0.20, 2);
-    $realDiscount = min(round((float)$submittedDiscount, 2), $maxDiscount);
-    $realTotal = round($realSubtotal - $realDiscount, 2);
+    $maxDiscountCents = (int)round($realSubtotalCents * 0.20);
+    $realTotalCents = $realSubtotalCents - $submittedDiscountCents;
 
     if (
-        abs($realTotal - (float)$submittedTotal) > 0.02 ||
-        (float)$cash < $realTotal
+        $submittedSubtotalCents !== $realSubtotalCents ||
+        $submittedDiscountCents > $maxDiscountCents ||
+        (
+            $submittedDiscountCents !== 0 &&
+            $submittedDiscountCents !== $maxDiscountCents
+        ) ||
+        $submittedTotalCents !== $realTotalCents
     ) {
         throw new RuntimeException(
-            'The total changed. Please review your cart and try again.'
+            'Product prices or order totals changed. Please review your cart and try again.'
+        );
+    }
+
+    if ($cashCents < $realTotalCents) {
+        throw new RuntimeException(
+            'Insufficient cash. Please enter an amount equal to or greater than the total.'
         );
     }
 
     $customerId = (int)$_SESSION['customer_id'];
-    $cash = (float)$cash;
-    $change = round($cash - $realTotal, 2);
+    $realSubtotal = $realSubtotalCents / 100;
+    $realDiscount = $submittedDiscountCents / 100;
+    $realTotal = $realTotalCents / 100;
+    $cash = $cashCents / 100;
+    $change = ($cashCents - $realTotalCents) / 100;
 
     $stmt = $conn->prepare(
         "INSERT INTO orders
@@ -163,16 +224,10 @@ try {
         'total' => $realTotal
     ]);
 } catch (RuntimeException $e) {
-    if ($conn->errno === 0) {
-        try {
-            $conn->rollback();
-        } catch (Throwable $ignored) {
-        }
-    } else {
-        try {
-            $conn->rollback();
-        } catch (Throwable $ignored) {
-        }
+    try {
+        $conn->rollback();
+    } catch (Throwable $rollbackError) {
+        error_log('Order rollback error: ' . $rollbackError->getMessage());
     }
 
     respond(['ok' => false, 'message' => $e->getMessage()], 400);
