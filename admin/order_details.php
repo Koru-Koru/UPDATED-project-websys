@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/loyalty.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 
@@ -39,11 +40,37 @@ $stmt->bind_param('i', $orderId);
 $stmt->execute();
 
 $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$trackingError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
+    $trackingUrl = $_POST['delivery_tracking_url'] ?? '';
+    if (!is_string($trackingUrl)) $trackingUrl = '';
+    $trackingUrl = trim($trackingUrl);
+    $scheme = strtolower((string)parse_url($trackingUrl, PHP_URL_SCHEME));
+    if ($trackingUrl !== '' && (
+        strlen($trackingUrl) > 2048 ||
+        !filter_var($trackingUrl, FILTER_VALIDATE_URL) ||
+        !in_array($scheme, ['http', 'https'], true) ||
+        parse_url($trackingUrl, PHP_URL_USER) !== null ||
+        parse_url($trackingUrl, PHP_URL_PASS) !== null
+    )) {
+        $trackingError = 'Enter a valid tracking link beginning with https:// or http://.';
+    } else {
+        $savedUrl = $trackingUrl === '' ? null : $trackingUrl;
+        $stmt = $conn->prepare('UPDATE orders SET delivery_tracking_url = ? WHERE order_id = ?');
+        $stmt->bind_param('si', $savedUrl, $orderId);
+        $stmt->execute();
+        set_flash($savedUrl === null ? 'Delivery tracking link removed.' : 'Delivery tracking link shared with the customer.');
+        header('Location: order_details.php?id=' . $orderId);
+        exit;
+    }
+}
 ?>
 
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -51,6 +78,7 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 
 <body class="admin-page">
@@ -61,7 +89,7 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                      class="rounded-circle bg-white" style="object-fit:contain;">
                 <span>Philippines' Best Coffee Admin</span>
             </a>
-            <a href="logout.php" class="btn btn-sm btn-outline-light">Log Out</a>
+            <?php account_theme_logout(); ?>
         </div>
     </nav>
 
@@ -80,12 +108,39 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             </span>
         </div>
 
+        <?php show_flash(); ?>
+        <?php render_order_loyalty($conn, (int)$orderId); ?>
+        <section class="card admin-card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h2 class="h5">Delivery tracking</h2>
+                <p class="text-secondary small">Paste the rider's live location or courier tracking link. The customer will see it in View Order.</p>
+                <?php if ($trackingError): ?><div class="alert alert-danger" role="alert"><?= h($trackingError) ?></div><?php endif; ?>
+                <form method="post" class="d-flex flex-wrap gap-2 align-items-end">
+                    <?= csrf_field() ?>
+                    <div class="flex-grow-1">
+                        <label for="delivery-tracking-url" class="form-label">Rider / courier tracking link</label>
+                        <input type="url" class="form-control" name="delivery_tracking_url" id="delivery-tracking-url" maxlength="2048" placeholder="https://..." value="<?= h($trackingError ? $trackingUrl : ($order['delivery_tracking_url'] ?? '')) ?>" aria-describedby="tracking-help">
+                    </div>
+                    <button type="submit" class="btn btn-coffee">Save tracking link</button>
+                </form>
+                <p id="tracking-help" class="small text-secondary mt-2 mb-0">Leave blank and save to remove the link. This shares a link; it does not automatically track the rider.</p>
+                <?php if (!empty($order['delivery_tracking_url'])): ?>
+                    <a class="btn btn-outline-coffee btn-sm mt-3" href="<?= h($order['delivery_tracking_url']) ?>" target="_blank" rel="noopener noreferrer">Open current tracking link ↗</a>
+                <?php endif; ?>
+            </div>
+        </section>
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="card admin-card shadow-sm h-100">
                     <div class="card-body p-4">
                         <h2 class="h5 mb-3">Customer Information</h2>
-                        <p><strong>Pickup:</strong> <?= h($order['pickup_at'] ?: 'As soon as ready') ?></p>
+                        <p><strong>Order type:</strong> <?= h($order['fulfillment_method']) ?></p>
+                        <?php if ($order['fulfillment_method'] === 'Delivery'): ?>
+                            <p class="mb-1"><strong>Delivery address:</strong></p>
+                            <p style="white-space:pre-wrap;overflow-wrap:anywhere"><?= h($order['delivery_address']) ?></p>
+                        <?php else: ?>
+                            <p><strong>Pickup:</strong> <?= h($order['pickup_at'] ?: 'As soon as ready') ?></p>
+                        <?php endif; ?>
                         <p>Payment: <?= h($order['payment_review']) ?><br>ID: <?= h($order['id_review']) ?></p>
                         <a class="btn btn-outline-coffee mb-3" href="review_order.php?id=<?= (int)$order['order_id'] ?>">Review documents</a>
 
@@ -171,7 +226,7 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                                 <strong><?= h($paymentMethod) ?></strong>
                             </div>
 
-                            <?php if ((float) $order['discount'] > 0): ?>
+                            <?php if ($order['id_review'] !== 'Not required'): ?>
                                 <div class="mb-3">
                                     <span class="d-block fw-semibold">Senior / PWD ID proof</span>
                                     <a href="discount_proof.php?id=<?= (int) $order['order_id'] ?>" target="_blank" rel="noopener">Review uploaded ID photo</a>

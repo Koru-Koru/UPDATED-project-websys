@@ -5,15 +5,7 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/order_features.php';
 require_admin();
 
-$allowedStatuses = [
-    'Placed',
-    'Preparing',
-    'Ready',
-    'Served',
-    'Delivered',
-    'Completed',
-    'Cancelled'
-];
+$allowedStatuses = array_keys(order_status_transitions());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
@@ -71,6 +63,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -78,6 +71,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 
 <body class="admin-page">
@@ -100,9 +94,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
             <span class="navbar-text d-none d-md-inline">
                 Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
             </span>
-            <a href="logout.php" class="btn btn-sm btn-outline-light">
-                Log Out
-            </a>
+            <?php account_theme_logout(); ?>
         </div>
     </div>
 </nav>
@@ -219,7 +211,12 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                             <a href="review_order.php?id=<?= (int)$order['order_id'] ?>">Review documents</a>
                                             <div>Payment: <?= h($order['payment_review']) ?></div>
                                             <div>ID: <?= h($order['id_review']) ?></div>
-                                            <div>Pickup: <?= h($order['pickup_at'] ?: 'As soon as ready') ?></div>
+                                            <div><strong><?= h($order['fulfillment_method']) ?></strong></div>
+                                            <?php if ($order['fulfillment_method'] === 'Delivery'): ?>
+                                                <div style="max-width:240px;white-space:pre-wrap;overflow-wrap:anywhere"><?= h($order['delivery_address']) ?></div>
+                                            <?php else: ?>
+                                                <div>Pickup: <?= h($order['pickup_at'] ?: 'As soon as ready') ?></div>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="small text-secondary mt-1">
                                             <?= h($order['payment_method'] ?? 'Cash') ?>
@@ -227,7 +224,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                     </td>
 
                                     <td>
-                                        <?php if ((float) $order['discount'] > 0): ?>
+                                        <?php if ($order['id_review'] !== 'Not required'): ?>
                                             <a class="d-block small mb-2" href="discount_proof.php?id=<?= (int) $order['order_id'] ?>" target="_blank" rel="noopener">Review Senior / PWD ID</a>
                                         <?php endif; ?>                                        <?php if (!empty($order['payment_proof'])): ?>
                                             <a

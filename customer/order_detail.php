@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/loyalty.php';
 require_once __DIR__ . '/../includes/customer_auth.php';
 
 require_customer();
@@ -13,7 +14,7 @@ if (!$orderId || $orderId < 1) {
 
 $stmt = $conn->prepare(
     'SELECT order_id, total, subtotal, discount, cash_received,
-            change_amount, payment_method, status, created_at, pickup_at, payment_review, payment_review_reason, id_review, id_review_reason
+            change_amount, payment_method, status, created_at, pickup_at, payment_review, payment_review_reason, id_review, id_review_reason, delivery_tracking_url, fulfillment_method, delivery_address
      FROM orders
      WHERE order_id = ? AND customer_id = ?'
 );
@@ -57,6 +58,7 @@ if ($isCashPayment) {
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -64,6 +66,7 @@ if ($isCashPayment) {
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 
 <body class="account-body">
@@ -87,35 +90,26 @@ if ($isCashPayment) {
                 </p>
             </div>
 
-            <section class="mb-4" aria-label="Order progress" aria-live="polite" id="order-progress">
+            <?php render_order_loyalty($conn, (int)$orderId); ?>
+            <section class="delivery-tracking-card mb-4" aria-label="Order fulfillment">
+                <h2 class="h5"><?= h($order['fulfillment_method']) ?> details</h2>
+                <?php if ($order['fulfillment_method'] === 'Delivery'): ?>
+                    <p class="small text-secondary mb-1">Delivery address</p>
+                    <p class="mb-0" style="white-space:pre-wrap;overflow-wrap:anywhere"><?= h($order['delivery_address']) ?></p>
+                <?php else: ?>
+                    <p class="mb-0">Pickup: <?= h($order['pickup_at'] ?: 'As soon as ready') ?></p>
+                <?php endif; ?>
+            </section>
+            <section class="delivery-tracking-card mb-4" aria-label="Delivery tracking">
+                <span class="feature-eyebrow">YOUR DELIVERY</span>
+                <h2 class="h5">Track your rider</h2>
+                <p class="small text-secondary" id="delivery-tracking-note"><?= empty($order['delivery_tracking_url']) ? 'Your tracking link will appear here when the shop adds it.' : 'Open the rider or courier link for delivery updates.' ?></p>
+                <a id="delivery-tracking-link" class="btn btn-coffee" target="_blank" rel="noopener noreferrer" <?php if (empty($order['delivery_tracking_url'])): ?>hidden<?php else: ?>href="<?= h($order['delivery_tracking_url']) ?>"<?php endif; ?>>Track delivery ↗</a>
+            </section>
+            <section class="mb-4" aria-label="Order progress" aria-live="polite" id="order-progress" data-progress-url="order_progress.php?id=<?= (int)$orderId ?>">
                 <p>Loading order progress…</p>
             </section>
-            <script>
-            (() => {
-                const panel = document.getElementById('order-progress');
-                async function refreshProgress() {
-                    try {
-                        const response = await fetch('order_progress.php?id=<?= (int)$orderId ?>', {cache: 'no-store'});
-                        if (!response.ok) throw new Error('Unable to load progress');
-                        const data = await response.json();
-                        panel.replaceChildren();
-                        const heading = document.createElement('h2'); heading.className = 'h5'; heading.textContent = 'Order progress: ' + data.status; panel.append(heading);
-                        const stages = document.createElement('ol'); stages.className = 'd-flex flex-wrap gap-4 ps-3';
-                        const steps = ['Placed', 'Preparing', 'Ready', 'Completed'];
-                        const position = ['Served', 'Delivered', 'Completed'].includes(data.status) ? 3 : steps.indexOf(data.status);
-                        steps.forEach((step, i) => { const li = document.createElement('li'); li.textContent = step; if (i <= position) li.className = 'fw-bold text-success'; if (step === data.status) li.setAttribute('aria-current', 'step'); stages.append(li); });
-                        panel.append(stages);
-                        const pickup = document.createElement('p'); pickup.textContent = 'Pickup: ' + (data.pickup_at || 'As soon as ready'); panel.append(pickup);
-                        ['payment', 'id'].forEach(kind => { const p = document.createElement('p'); p.textContent = (kind === 'id' ? 'Senior / PWD ID: ' : 'Payment review: ') + data[kind + '_review'] + (data[kind + '_review_reason'] ? ' — ' + data[kind + '_review_reason'] : ''); panel.append(p); });
-                        if (data.payment_review === 'Rejected' || data.id_review === 'Rejected') { const p = document.createElement('p'); p.className = 'text-danger'; p.textContent = 'Contact the shop about the rejected document before your order can proceed.'; panel.append(p); }
-                        const history = document.createElement('ul');
-                        data.history.forEach(entry => { const li = document.createElement('li'); li.textContent = entry.status + ' · ' + entry.created_at; history.append(li); }); panel.append(history);
-                    } catch (error) { panel.textContent = 'Progress is temporarily unavailable. Refresh the page to try again.'; }
-                }
-                refreshProgress();
-                setInterval(() => { if (!document.hidden) refreshProgress(); }, 15000);
-            })();
-            </script>
+            <script src="../assets/order-progress.js?v=<?= filemtime(__DIR__ . '/../assets/order-progress.js') ?>" defer></script>
             <h2 class="h5 mb-3">Order Items</h2>
 
             <div class="table-responsive">

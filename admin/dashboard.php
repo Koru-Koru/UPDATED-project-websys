@@ -15,12 +15,14 @@ $customerCount = (int) $conn
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Dashboard | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 <body class="admin-page">
 
@@ -28,7 +30,7 @@ $customerCount = (int) $conn
     <div class="container">
         <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
             <img
-                src="../assets/Bestcoffee.jpg" alt="Philippines' Best Coffee logo" style="height: 38px; width: 38px; object-fit: contain; border-radius: 50%; background: #fff;">
+                src="../Bestcoffee.jpg" alt="Philippines' Best Coffee logo" style="height: 38px; width: 38px; object-fit: contain; border-radius: 50%; background: #fff;">
             <span>Philippines' Best Coffee Admin</span>
         </a>
 
@@ -36,9 +38,7 @@ $customerCount = (int) $conn
             <span class="navbar-text">
                 Hi, <?= h($_SESSION['admin_username']) ?>
             </span>
-            <a href="logout.php" class="btn btn-sm btn-outline-light">
-                Log Out
-            </a>
+            <?php account_theme_logout(); ?>
         </div>
     </div>
 </nav>
@@ -47,6 +47,7 @@ $customerCount = (int) $conn
     <h1 class="h2 mb-4">Admin Dashboard</h1>
     <div class="dashboard-shortcuts d-flex flex-wrap gap-2 mb-4">
         <a href="settings.php" class="btn btn-outline-coffee">Password settings</a>
+        <a href="reward_stock.php" class="btn btn-outline-coffee">Mug &amp; flask stock</a>
         <a href="recovery.php" class="btn btn-outline-coffee">Customer recovery requests</a>
         <a href="analytics.php" class="btn btn-outline-coffee">Reports and CSV export</a>
     </div>

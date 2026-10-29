@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/loyalty.php';
+$loyaltyBalance = empty($_SESSION['customer_id']) ? 0 : loyalty_balance($conn, (int)$_SESSION['customer_id']);
 $stockSupported = products_support_stock($conn);
 $result = $conn->query('SELECT product_id, name, category, description, price, image_url, is_available' . ($stockSupported ? ', stock' : '') . ' FROM products ORDER BY FIELD(category, "Hot", "Iced", "Snacks and Bites"), name');
 $products = $result->fetch_all(MYSQLI_ASSOC);
@@ -204,8 +206,9 @@ function render_products(array $items): void {
               <span>Subtotal</span>
               <strong id="receipt-subtotal">₱0.00</strong>
             </div>
+            <div id="receipt-merchandise" class="summary-row d-none"><span>Reward item</span><strong id="receipt-merchandise-name"></strong></div>
             <div id="receipt-discount-row" class="summary-row summary-row-discount d-none">
-              <span>Senior / PWD discount</span>
+              <span id="receipt-discount-label">Senior / PWD discount</span>
               <strong id="receipt-discount">−₱0.00</strong>
             </div>
             <div class="summary-row summary-row-total">
@@ -218,6 +221,21 @@ function render_products(array $items): void {
         <section class="checkout-panel checkout-payment" aria-label="Payment details">
           <h4 class="checkout-section-title">Payment</h4>
 
+          <section id="loyalty-program" class="loyalty-card mb-3" data-balance="<?= $loyaltyBalance ?>" data-rewards="<?= h(json_encode(loyalty_rewards($conn))) ?>" data-cup-ids="<?= h(json_encode(array_map('intval', array_column(array_filter($products, fn($p) => in_array($p['category'], ['Hot', 'Iced'], true) && (float)$p['price'] > 0), 'product_id')))) ?>">
+            <span class="feature-eyebrow">COFFEE REWARDS</span>
+            <p class="mb-1">Available points: <strong id="loyalty-balance"><?= $loyaltyBalance ?></strong></p>
+            <p id="loyalty-estimate" class="small text-secondary mb-2">Earn 1 point per Hot or Iced drink after fulfillment.</p>
+            <label for="loyalty-reward" class="form-label">Choose your reward</label>
+            <select id="loyalty-reward" class="form-select mb-2">
+              <?php foreach (loyalty_rewards($conn) as $rewardId => $reward): ?>
+                <option value="<?= $rewardId ?>" <?= (int)$rewardId === LOYALTY_REWARD_POINTS ? 'selected' : '' ?>><?= $reward['points'] ?> points · <?= h($reward['label']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <p id="reward-stock-note" class="small fw-semibold" aria-live="polite"></p>
+            <div id="reward-merchandise-preview" class="merchandise-reward mb-3 d-none"><img alt="Selected merchandise reward"><span></span></div>
+            <label class="d-flex align-items-center gap-2"><input type="checkbox" id="redeem-loyalty" <?= $loyaltyBalance < LOYALTY_REWARD_POINTS ? 'disabled' : '' ?>> <span>Apply selected reward</span></label>
+            <p class="small text-secondary mt-2 mb-0">One reward per order. Cash rewards need a total above the discount amount. Mug and flask rewards are included with your order. Choose a reward or the Senior / PWD discount.</p>
+          </section>
           <div class="form-check form-switch discount-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="senior-pwd">
             <label class="form-check-label" for="senior-pwd">
@@ -233,7 +251,19 @@ function render_products(array $items): void {
             <img id="discount-proof-preview" class="d-none rounded mt-2" alt="Selected Senior or PWD ID" style="max-width:100%;max-height:180px;object-fit:contain;">
           </div>
 
-          <div class="mt-3 mb-3">
+          <fieldset class="fulfillment-options mt-3 mb-3">
+            <legend class="form-label fw-semibold">How would you like your order?</legend>
+            <div class="d-flex gap-2">
+              <label class="fulfillment-choice"><input type="radio" name="fulfillment-method" value="Pickup" checked> <span>Pickup</span></label>
+              <label class="fulfillment-choice"><input type="radio" name="fulfillment-method" value="Delivery"> <span>Delivery</span></label>
+            </div>
+          </fieldset>
+          <div id="delivery-address-panel" class="mb-3 d-none">
+            <label for="delivery-address" class="form-label fw-semibold">Delivery address</label>
+            <textarea id="delivery-address" class="form-control" rows="3" maxlength="500" autocomplete="shipping street-address" placeholder="House / unit number, street, barangay, city" aria-describedby="delivery-address-help"></textarea>
+            <p id="delivery-address-help" class="small text-secondary mt-2">Include your complete address and a nearby landmark so the rider can find you.</p>
+          </div>
+          <div id="pickup-time-panel" class="mt-3 mb-3">
             <label for="pickup-at" class="form-label fw-semibold">Pickup time (optional)</label>
             <input type="datetime-local" id="pickup-at" class="form-control" aria-describedby="pickup-help">
             <p id="pickup-help" class="small text-secondary mt-2">Leave blank for pickup as soon as ready. Schedule at least 15 minutes ahead, up to 7 days ahead. Times are in Philippine time.</p>

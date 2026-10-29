@@ -37,14 +37,19 @@ feature_page_start('Review order #' . $id);
 ?>
 <a href="orders.php" class="btn btn-outline-coffee mb-3">Back to orders</a>
 <?php if ($error): ?><div class="alert alert-danger"><?= h($error) ?></div><?php endif; ?>
+<p>Order type: <strong><?= h($order['fulfillment_method']) ?></strong></p>
+<?php if ($order['fulfillment_method'] === 'Delivery'): ?>
+<p style="white-space:pre-wrap;overflow-wrap:anywhere">Delivery address: <?= h($order['delivery_address']) ?></p>
+<?php else: ?>
 <p>Pickup: <strong><?= h($order['pickup_at'] ?: 'As soon as ready') ?></strong></p>
+<?php endif; ?>
 <?php foreach (['payment' => 'Payment receipt', 'id' => 'Senior / PWD ID'] as $kind => $label): ?>
 <section class="card card-body mb-3">
 <h2 class="h5"><?= h($label) ?>: <?= h($order[$kind . '_review']) ?></h2>
 <p><?= h($order[$kind . '_review_reason']) ?></p>
 <?php if ($kind === 'payment' && !empty($order['payment_proof'])): ?>
 <a href="../<?= h($order['payment_proof']) ?>" target="_blank" rel="noopener">Open payment receipt</a>
-<?php elseif ($kind === 'id' && (float)$order['discount'] > 0): ?>
+<?php elseif ($kind === 'id' && $order['id_review'] !== 'Not required'): ?>
 <a href="discount_proof.php?id=<?= $id ?>" target="_blank" rel="noopener">Open ID photo</a>
 <?php endif; ?>
 <?php if ($order[$kind . '_review'] !== 'Not required' && !in_array($order['status'], ['Completed', 'Cancelled'], true)): ?>

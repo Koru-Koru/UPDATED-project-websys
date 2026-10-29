@@ -184,11 +184,13 @@ $formAction = $editProduct ? 'edit' : 'add';
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Product Maintenance | Philippines' Best Coffee</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 
 <body class="admin-page">
@@ -204,7 +206,7 @@ $formAction = $editProduct ? 'edit' : 'add';
                 <span class="navbar-text d-none d-md-inline">
                     Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
                 </span>
-                <a href="logout.php" class="btn btn-sm btn-outline-light">Log out</a>
+                <?php account_theme_logout(); ?>
             </div>
         </div>
     </nav>
@@ -213,7 +215,7 @@ $formAction = $editProduct ? 'edit' : 'add';
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
             <div>
                 <h1 class="h2 mb-1">Product Maintenance</h1>
-                <p class="text-secondary mb-0">Add, update, and manage the coffee menu here pogi si sir.</p>
+                <p class="text-secondary mb-0">Add, update, and manage the coffee menu.</p>
             </div>
             <a href="dashboard.php" class="btn btn-outline-coffee">Back to Dashboard</a>
         </div>

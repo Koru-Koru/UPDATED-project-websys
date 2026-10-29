@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_proof VARCHAR(255) DEFAULT NULL,
     status ENUM('Placed','Preparing','Ready','Served','Delivered','Completed','Cancelled') NOT NULL DEFAULT 'Placed',
     pickup_at DATETIME NULL,
+    delivery_tracking_url VARCHAR(2048) DEFAULT NULL,
+    fulfillment_method VARCHAR(20) NOT NULL DEFAULT 'Pickup',
+    delivery_address VARCHAR(500) DEFAULT NULL,
     payment_review VARCHAR(20) NOT NULL DEFAULT 'Pending',
     payment_review_reason VARCHAR(500) NOT NULL DEFAULT '',
     id_review VARCHAR(20) NOT NULL DEFAULT 'Not required',
@@ -96,6 +99,37 @@ CREATE TABLE IF NOT EXISTS customer_recovery_requests (
     FOREIGN KEY(customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+
+CREATE TABLE IF NOT EXISTS order_loyalty (
+    order_id INT PRIMARY KEY,
+    points_pending INT NOT NULL DEFAULT 0,
+    reward_label VARCHAR(100) DEFAULT NULL,
+    reward_image VARCHAR(255) DEFAULT NULL,
+    inventory_reward_id VARCHAR(40) DEFAULT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS loyalty_transactions (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    order_id INT DEFAULT NULL,
+    kind ENUM('Earn','Redeem','Refund','Adjust') NOT NULL,
+    points INT NOT NULL,
+    reason VARCHAR(255) DEFAULT NULL,
+    admin_id INT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_order_loyalty (order_id, kind),
+    KEY customer_loyalty (customer_id, transaction_id),
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS reward_inventory (
+    reward_id VARCHAR(40) PRIMARY KEY,
+    stock INT DEFAULT NULL
+) ENGINE=InnoDB;
+INSERT INTO reward_inventory (reward_id, stock) SELECT '30', NULL WHERE NOT EXISTS (SELECT 1 FROM reward_inventory WHERE reward_id = '30');
+INSERT INTO reward_inventory (reward_id, stock) SELECT '50', NULL WHERE NOT EXISTS (SELECT 1 FROM reward_inventory WHERE reward_id = '50');
 -- Add only the columns missing from an older database.
 
 SET @update_sql = (
@@ -208,6 +242,81 @@ SET @update_sql = (
 PREPARE update_stmt FROM @update_sql;
 EXECUTE update_stmt;
 DEALLOCATE PREPARE update_stmt;
+-- Optional rider / courier tracking link, shared through the order details.
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN delivery_tracking_url VARCHAR(2048) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'delivery_tracking_url'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN fulfillment_method VARCHAR(20) NOT NULL DEFAULT ''Pickup''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'fulfillment_method'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN delivery_address VARCHAR(500) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'delivery_address'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE order_loyalty ADD COLUMN reward_label VARCHAR(100) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_loyalty' AND COLUMN_NAME = 'reward_label'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE order_loyalty ADD COLUMN reward_image VARCHAR(255) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_loyalty' AND COLUMN_NAME = 'reward_image'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+-- Allow admin adjustments without creating a fake order.
+ALTER TABLE loyalty_transactions
+    MODIFY order_id INT DEFAULT NULL,
+    MODIFY kind ENUM('Earn','Redeem','Refund','Adjust') NOT NULL;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE loyalty_transactions ADD COLUMN reason VARCHAR(255) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'loyalty_transactions' AND COLUMN_NAME = 'reason'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE loyalty_transactions ADD COLUMN admin_id INT DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'loyalty_transactions' AND COLUMN_NAME = 'admin_id'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE order_loyalty ADD COLUMN inventory_reward_id VARCHAR(40) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_loyalty' AND COLUMN_NAME = 'inventory_reward_id'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
 -- Keep every supported order status.
 ALTER TABLE orders
     MODIFY status ENUM('Placed','Preparing','Ready','Served','Delivered','Completed','Cancelled')
@@ -217,7 +326,8 @@ ALTER TABLE orders
 UPDATE orders SET payment_review = 'Not required'
 WHERE payment_method = 'Cash' AND payment_review = 'Pending';
 UPDATE orders SET id_review = 'Pending'
-WHERE discount > 0 AND id_review = 'Not required';
+WHERE discount > 0 AND id_review = 'Not required'
+  AND NOT EXISTS (SELECT 1 FROM loyalty_transactions l WHERE l.order_id = orders.order_id AND l.kind = 'Redeem');
 
 -- Fill in missing sample products without changing existing products.
 INSERT INTO products (name, category, description, price, image_url, is_available)

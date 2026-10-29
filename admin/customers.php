@@ -103,7 +103,8 @@ if (isset($_GET['edit'])) {
 }
 
 $customers = $conn
-    ->query('SELECT customer_id, full_name, email, phone, created_at
+    ->query('SELECT customer_id, full_name, email, phone, created_at,
+                    (SELECT COALESCE(SUM(points),0) FROM loyalty_transactions l WHERE l.customer_id = customers.customer_id) AS loyalty_balance
              FROM customers
              ORDER BY customer_id DESC')
     ->fetch_all(MYSQLI_ASSOC);
@@ -111,12 +112,14 @@ $customers = $conn
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Customer Maintenance | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 <body class="admin-page">
 
@@ -137,9 +140,7 @@ $customers = $conn
             <span class="navbar-text">
                 Hi, <?= h($_SESSION['admin_username']) ?>
             </span>
-            <a href="logout.php" class="btn btn-sm btn-outline-light">
-                Log Out
-            </a>
+            <?php account_theme_logout(); ?>
         </div>
     </div>
 </nav>
@@ -253,7 +254,7 @@ $customers = $conn
             <h2 class="h5 mb-3">Customer Records</h2>
 
             <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle">
+                <table class="table table-hover align-middle customer-records-table">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -268,44 +269,26 @@ $customers = $conn
                     <tbody>
                         <?php foreach ($customers as $customer): ?>
                             <tr>
+                                <td class="text-secondary">#<?= (int)$customer['customer_id'] ?></td>
                                 <td>
-                                    <?= (int) $customer['customer_id'] ?>
+                                    <div class="customer-record-name"><?= h($customer['full_name']) ?></div>
+                                    <span class="customer-points-badge">Coffee rewards: <?= (int)$customer['loyalty_balance'] ?> points</span>
                                 </td>
-                                <td><?= h($customer['full_name']) ?></td>
-                                <td><?= h($customer['email']) ?></td>
-                                <td><?= h($customer['phone'] ?? '') ?></td>
-                                <td><?= h($customer['created_at'] ?? '') ?></td>
+                                <td class="customer-email"><?= h($customer['email']) ?></td>
+                                <td class="text-nowrap"><?= h($customer['phone'] ?: '—') ?></td>
+                                <td class="text-nowrap">
+                                    <?= h(date('M j, Y', strtotime($customer['created_at']))) ?>
+                                    <div class="small text-secondary"><?= h(date('g:i A', strtotime($customer['created_at']))) ?></div>
+                                </td>
                                 <td>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <a
-                                            href="customers.php?edit=<?= (int) $customer['customer_id'] ?>#customer-form"
-                                            class="btn btn-sm btn-outline-primary"
-                                            aria-label="Edit customer <?= h($customer['full_name']) ?>"
-                                        >
-                                            Edit
-                                        </a>
-
-                                        <form
-                                            method="post"
-                                            onsubmit="return confirm('Delete this customer account?');"
-                                        >
+                                    <div class="customer-record-actions">
+                                        <a href="loyalty.php?id=<?= (int)$customer['customer_id'] ?>" class="btn btn-sm btn-outline-coffee">Manage points</a>
+                                        <a href="customers.php?edit=<?= (int)$customer['customer_id'] ?>#customer-form" class="btn btn-sm btn-outline-primary" aria-label="Edit customer <?= h($customer['full_name']) ?>">Edit</a>
+                                        <form method="post" onsubmit="return confirm('Delete this customer account?');">
                                             <?= csrf_field() ?>
-                                            <input
-                                                type="hidden"
-                                                name="action"
-                                                value="delete"
-                                            >
-                                            <input
-                                                type="hidden"
-                                                name="customer_id"
-                                                value="<?= (int) $customer['customer_id'] ?>"
-                                            >
-                                            <button
-                                                type="submit"
-                                                class="btn btn-sm btn-outline-danger"
-                                            >
-                                                Delete
-                                            </button>
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="customer_id" value="<?= (int)$customer['customer_id'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete customer <?= h($customer['full_name']) ?>">Delete</button>
                                         </form>
                                     </div>
                                 </td>

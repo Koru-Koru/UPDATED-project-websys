@@ -31,6 +31,47 @@ PROJECT FEATURES
   Staff verify identity and share a single-use reset link valid for 30 minutes.
   Automatic email delivery is not configured.
 
+- Admin Orders > View Order: save a rider or courier tracking URL. The customer sees
+  a Track delivery button in their order details; it updates with order progress.
+- Checkout offers Pickup or Delivery. Delivery requires a complete address, saved
+  with the order and shown to the admin and customer. Pickup scheduling is hidden
+  for delivery orders. No automatic delivery fee is added.
+- Light and dark themes share one saved preference across account and admin pages.
+
+COFFEE REWARDS
+- Each paid Hot or Iced drink earns 1 point once an order is Served, Delivered,
+  or Completed. Snacks and free (zero-price) drinks do not earn points.
+- Choose one reward at checkout: 5 points = PHP 20 off; 10 = PHP 50 off;
+  20 = PHP 100 off; 30 = branded coffee mug; 50 = branded coffee flask.
+- Cash discounts require a subtotal above the discount amount. Merchandise rewards
+  add one mug or flask to a paid order without reducing the cash total.
+- One reward per order; rewards cannot combine with the Senior/PWD discount.
+- Points are deducted at checkout and returned once if the order is cancelled.
+- Points never expire. Balances start at zero; older orders are not backfilled.
+- Customers see balance, progress, and the latest 20 point transactions in Profile.
+- Admin Customers shows balances and a Manage points link. Admins can add/deduct
+  1 to 10,000 whole points with a required reason; balances cannot become negative.
+  Manual changes record the admin and appear in the customer's points history.
+- Order details show earned/redeemed points.
+- The database update is already applied locally. Other installations import
+  database_update.sql; no separate loyalty update file is needed.
+
+REWARD STOCK
+- Admin Dashboard > Mug & flask stock lets staff set the available quantity.
+- Enter 0 to mark a mug or flask sold out; leave blank for unlimited stock.
+- Quantities appear on the customer profile and checkout reward selection.
+- Checkout reserves one item using a database row lock. Failed orders roll back;
+  cancelled orders restore their reserved item once. Existing stock is not reset
+  when database_update.sql is imported again.
+
+CODE ORGANIZATION
+- includes/layout.php: shared page headers and footers.
+- includes/account_theme.php: theme assets and the switch beside Log Out.
+- includes/checkout.php: amount validation and proof uploads.
+- includes/loyalty.php: points rules, balances, awards, redemptions, and refunds.
+- includes/order_features.php: order status changes, stock restoration, reset tokens.
+- assets/order-progress.js: customer order tracking updates.
+
 UPLOADS
 - JPG, PNG, and WebP photos up to 5 MB.
 - Payment receipts: uploads/payment_proofs/

@@ -2069,3 +2069,50 @@ body.cart-scroll-lock {
     .stock-panel-heading { flex-direction: column; }
     .stock-product-icon { display: none; }
 }
+
+.delivery-tracking-card { padding: 1.4rem; border: 1px solid var(--border); border-radius: 1rem; background: #fbf5ec; }
+.delivery-tracking-card h2 { color: var(--coffee); font-family: Georgia, serif; }
+.delivery-tracking-card [hidden] { display: none !important; }
+
+.fulfillment-options { border: 0; padding: 0; min-width: 0; }
+.fulfillment-options legend { float: none; font-size: 1rem; }
+.fulfillment-choice { flex: 1; display: flex; align-items: center; gap: .5rem; padding: .85rem 1rem; border: 1px solid var(--border); border-radius: .8rem; background: #fffdfa; cursor: pointer; }
+.fulfillment-choice:has(input:checked) { border-color: var(--accent); background: #fff3ee; box-shadow: 0 0 0 2px #9f2d2010; }
+.fulfillment-choice input { accent-color: var(--accent); }
+#delivery-address-panel { padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: #faf3e9; }
+#delivery-address { resize: vertical; min-height: 95px; }
+
+/* Coffee rewards, shared by profile, checkout, and order details. */
+.loyalty-card { padding: 1.2rem; border: 1px solid var(--border); border-radius: 1rem; background: #fbf3e6; }
+.loyalty-card h2 { font-family: Georgia, serif; color: var(--coffee); }
+.loyalty-card input { accent-color: var(--accent); flex-shrink: 0; }
+.loyalty-progress { height: .7rem; border-radius: 1rem; background: #ecdfcf; }
+.loyalty-progress .progress-bar { background: #9f5c35; }
+.loyalty-rewards-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start; gap: .75rem; }
+.loyalty-reward-option { grid-column: span 2; display: flex; min-width: 0; gap: .85rem; padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: #fbf5ec; }
+.loyalty-reward-option span, .loyalty-reward-option small { font-size: .75rem; color: #806b5b; }
+.loyalty-reward-option.is-ready { border-color: #799667; background: #f0f6e9; }
+.reward-product-image { display: block; width: 88px; height: 88px; flex-shrink: 0; object-fit: cover; border-radius: .6rem; }
+.merchandise-reward { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; }
+.merchandise-reward img { width: 80px; height: 80px; border-radius: .75rem; object-fit: cover; flex-shrink: 0; }
+#receipt-merchandise strong { max-width: 65%; text-align: right; }
+
+.loyalty-reward-option.is-merchandise { grid-column: span 3; align-items: center; }
+.reward-content { display: flex; flex-direction: column; gap: .3rem; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 575.98px) {
+    .loyalty-rewards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .loyalty-reward-option { grid-column: span 1; padding: .85rem; }
+    .loyalty-reward-option:nth-child(3), .loyalty-reward-option.is-merchandise { grid-column: span 2; }
+    .reward-product-image { width: 72px; height: 72px; }
+}
+/* Customer records: one balance badge and one clear group of actions. */
+.customer-records-table { margin-bottom: 0; }
+.customer-records-table th { padding: .85rem .65rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #92725a; white-space: nowrap; }
+.customer-records-table td { padding: 1rem .65rem; }
+.customer-record-name { font-weight: 600; margin-bottom: .4rem; min-width: 160px; }
+.customer-points-badge { display: inline-block; padding: .3rem .6rem; border-radius: 2rem; background: #f2e7d8; color: #785139; font-size: .7rem; white-space: nowrap; }
+.customer-record-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: nowrap; }
+.customer-record-actions .btn { white-space: nowrap; padding: .45rem .7rem; }
+.customer-record-actions form { margin: 0; }
+.customer-email { overflow-wrap: anywhere; min-width: 160px; }
+.reward-stock-image { width: 100%; height: 180px; object-fit: contain; border-radius: .8rem; }

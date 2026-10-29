@@ -146,6 +146,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -154,6 +155,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <?php account_theme_assets(); ?>
 </head>
 
 <body class="admin-page">
@@ -175,7 +177,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
             <span class="navbar-text d-none d-md-inline">
                 Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
             </span>
-            <a href="logout.php" class="btn btn-sm btn-outline-light">Log Out</a>
+            <?php account_theme_logout(); ?>
         </div>
     </div>
 </nav>
@@ -419,7 +421,7 @@ const salesValues = <?= json_encode($salesValues) ?>;
 const categoryLabels = <?= json_encode($categoryLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 const categoryValues = <?= json_encode($categoryValues) ?>;
 
-new Chart(document.getElementById('salesChart'), {
+const salesChart = new Chart(document.getElementById('salesChart'), {
     type: 'line',
     data: {
         labels: salesLabels,
@@ -442,9 +444,10 @@ new Chart(document.getElementById('salesChart'), {
 });
 
 const categoryCanvas = document.getElementById('categoryChart');
+let categoryChart = null;
 
 if (categoryCanvas) {
-    new Chart(categoryCanvas, {
+    categoryChart = new Chart(categoryCanvas, {
         type: 'doughnut',
         data: {
             labels: categoryLabels,
@@ -461,6 +464,31 @@ if (categoryCanvas) {
         }
     });
 }
+
+function updateChartTheme() {
+    const dark = document.documentElement.dataset.coffeeTheme === 'dark';
+    const text = dark ? '#e5d1bc' : '#675443';
+    const grid = dark ? '#493b32' : '#eadfd3';
+    for (const chart of [salesChart, categoryChart]) {
+        if (!chart) continue;
+        chart.options.plugins.legend.labels = { ...chart.options.plugins.legend.labels, color: text };
+        if (chart === salesChart) {
+            for (const axis of ['x', 'y']) {
+                chart.options.scales[axis] = {
+                    ...chart.options.scales[axis],
+                    ticks: { color: text },
+                    grid: { color: grid },
+                    border: { color: grid }
+                };
+            }
+        }
+        chart.update('none');
+    }
+}
+updateChartTheme();
+new MutationObserver(updateChartTheme).observe(document.documentElement, {
+    attributes: true, attributeFilter: ['data-coffee-theme']
+});
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>

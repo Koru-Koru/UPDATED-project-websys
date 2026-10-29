@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_proof VARCHAR(255) DEFAULT NULL,
     status ENUM('Placed','Preparing','Ready','Served','Delivered','Completed','Cancelled') NOT NULL DEFAULT 'Placed',
     pickup_at DATETIME NULL,
+    delivery_tracking_url VARCHAR(2048) DEFAULT NULL,
+    fulfillment_method VARCHAR(20) NOT NULL DEFAULT 'Pickup',
+    delivery_address VARCHAR(500) DEFAULT NULL,
     payment_review VARCHAR(20) NOT NULL DEFAULT 'Pending',
     payment_review_reason VARCHAR(500) NOT NULL DEFAULT '',
     id_review VARCHAR(20) NOT NULL DEFAULT 'Not required',
@@ -96,6 +99,37 @@ CREATE TABLE IF NOT EXISTS customer_recovery_requests (
     FOREIGN KEY(customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+
+CREATE TABLE IF NOT EXISTS order_loyalty (
+    order_id INT PRIMARY KEY,
+    points_pending INT NOT NULL DEFAULT 0,
+    reward_label VARCHAR(100) DEFAULT NULL,
+    reward_image VARCHAR(255) DEFAULT NULL,
+    inventory_reward_id VARCHAR(40) DEFAULT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS loyalty_transactions (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    order_id INT DEFAULT NULL,
+    kind ENUM('Earn','Redeem','Refund','Adjust') NOT NULL,
+    points INT NOT NULL,
+    reason VARCHAR(255) DEFAULT NULL,
+    admin_id INT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_order_loyalty (order_id, kind),
+    KEY customer_loyalty (customer_id, transaction_id),
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS reward_inventory (
+    reward_id VARCHAR(40) PRIMARY KEY,
+    stock INT DEFAULT NULL
+) ENGINE=InnoDB;
+INSERT INTO reward_inventory (reward_id, stock) SELECT '30', NULL WHERE NOT EXISTS (SELECT 1 FROM reward_inventory WHERE reward_id = '30');
+INSERT INTO reward_inventory (reward_id, stock) SELECT '50', NULL WHERE NOT EXISTS (SELECT 1 FROM reward_inventory WHERE reward_id = '50');
 -- Sample menu. Existing products are kept unchanged on repeat imports.
 INSERT INTO products (name, category, description, price, image_url, is_available)
 SELECT 'Classic Espresso','Hot','Bold, strong, and purely Filipino — the essence of every true brew.',145,'assets/Coffee/espresso.jpg',1

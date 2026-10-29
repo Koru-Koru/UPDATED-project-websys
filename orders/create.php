@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
+require_once __DIR__ . '/../includes/checkout.php';
+require_once __DIR__ . '/../includes/loyalty.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -10,87 +12,6 @@ function respond(array $data, int $status = 200): void
     exit;
 }
 
-function submitted_amount_to_cents($value): ?int
-{
-    if (!is_int($value) && !is_float($value)) {
-        return null;
-    }
-
-    $amount = (float)$value;
-    if (!is_finite($amount) || $amount < 0 || $amount > 99999999.99) {
-        return null;
-    }
-
-    $scaled = $amount * 100;
-    $cents = (int)round($scaled);
-
-    return abs($scaled - $cents) < 0.0001 ? $cents : null;
-}
-
-function database_amount_to_cents($value): ?int
-{
-    if (
-        !is_string($value) ||
-        !preg_match('/^\\d{1,8}(?:\\.\\d{1,2})?$/D', $value)
-    ) {
-        return null;
-    }
-
-    [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
-
-    return ((int)$whole * 100) + (int)str_pad($fraction, 2, '0');
-}
-
-function store_payment_proof(string $field = 'payment_proof', string $folder = 'payment_proofs', string $label = 'Proof of payment'): ?string
-{
-    if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
-        return null;
-    }
-
-    $file = $_FILES[$field];
-
-    if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
-        throw new RuntimeException("$label is too large. Please upload an image 5 MB or smaller.");
-    }
-
-    if ($file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
-        throw new RuntimeException("Could not upload $label. Please try again.");
-    }
-
-    if ((int) $file['size'] > 5 * 1024 * 1024) {
-        throw new RuntimeException("$label is too large. Please upload an image 5 MB or smaller.");
-    }
-
-    $imageInfo = @getimagesize($file['tmp_name']);
-    $extensions = [
-        IMAGETYPE_JPEG => 'jpg',
-        IMAGETYPE_PNG => 'png',
-        IMAGETYPE_WEBP => 'webp'
-    ];
-
-    if (!$imageInfo || !isset($extensions[$imageInfo[2]])) {
-        throw new RuntimeException("$label must be a JPG, PNG, or WebP image.");
-    }
-
-    $directory = __DIR__ . '/../uploads/' . $folder;
-
-    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException("Could not save $label. Please try again.");
-    }
-
-    $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$imageInfo[2]];
-
-    if (!move_uploaded_file($file['tmp_name'], $directory . '/' . $filename)) {
-        throw new RuntimeException("Could not save $label. Please try again.");
-    }
-
-    return 'uploads/' . $folder . '/' . $filename;
-}
-
-function orders_support_payment_proof(mysqli $conn): bool
-{
-    return $conn->query("SHOW COLUMNS FROM orders WHERE Field = 'payment_proof'")->num_rows > 0;
-}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     respond(['ok' => false, 'message' => 'Method not allowed.'], 405);
@@ -134,6 +55,14 @@ if (!is_array($data)) {
     respond(['ok' => false, 'message' => 'Invalid order data.'], 400);
 }
 
+$redeemLoyalty = $data['redeem_loyalty'] ?? false;
+if (!is_bool($redeemLoyalty)) respond(['ok' => false, 'message' => 'Invalid loyalty selection.'], 400);
+$rewardId = $data['loyalty_reward'] ?? (string)LOYALTY_REWARD_POINTS;
+$rewards = loyalty_rewards();
+if ($redeemLoyalty && ((!is_string($rewardId) && !is_int($rewardId)) || !isset($rewards[$rewardId]))) {
+    respond(['ok' => false, 'message' => 'Choose a valid loyalty reward.'], 400);
+}
+$selectedReward = $redeemLoyalty ? $rewards[$rewardId] : null;
 $items = $data['items'] ?? [];
 $paymentMethod = is_string($data['payment_method'] ?? null) ? $data['payment_method'] : 'Cash';
 $cashCents = submitted_amount_to_cents($data['cash_received'] ?? null);
@@ -155,7 +84,19 @@ if (
     respond(['ok' => false, 'message' => 'Order details are invalid.'], 400);
 }
 
-$pickupInput = $data['pickup_at'] ?? '';
+$fulfillmentMethod = $data['fulfillment_method'] ?? 'Pickup';
+$deliveryAddress = $data['delivery_address'] ?? '';
+if (!is_string($fulfillmentMethod) || !in_array($fulfillmentMethod, ['Pickup', 'Delivery'], true)) {
+    respond(['ok' => false, 'message' => 'Choose Pickup or Delivery.'], 400);
+}
+if (!is_string($deliveryAddress) || mb_strlen(trim($deliveryAddress), 'UTF-8') > 500) {
+    respond(['ok' => false, 'message' => 'Enter a delivery address of 500 characters or fewer.'], 400);
+}
+$deliveryAddress = $fulfillmentMethod === 'Delivery' ? trim($deliveryAddress) : null;
+if ($fulfillmentMethod === 'Delivery' && $deliveryAddress === '') {
+    respond(['ok' => false, 'message' => 'Enter your complete delivery address.'], 400);
+}
+$pickupInput = $fulfillmentMethod === 'Pickup' ? ($data['pickup_at'] ?? '') : '';
 $pickupAt = null;
 if ($pickupInput !== '') {
     $zone = new DateTimeZone('Asia/Manila');
@@ -172,13 +113,20 @@ $discountProof = null;
 $paymentProof = null;
 
 try {
-    if ($submittedDiscountCents > 0) {
+    if ($submittedDiscountCents > 0 && !$redeemLoyalty) {
         $discountProof = store_payment_proof('discount_proof', 'discount_proofs', 'Senior / PWD ID photo');
         if ($discountProof === null) {
             throw new RuntimeException('Upload your Senior or PWD ID photo to use the discount.');
         }
     }
     $conn->begin_transaction();
+    loyalty_lock_customer($conn, $customerId);
+    if ($redeemLoyalty && loyalty_balance($conn, $customerId) < $selectedReward['points']) {
+        throw new RuntimeException('You do not have enough available points for this reward. Refresh your cart and try again.');
+    }
+    $inventoryRewardId = $redeemLoyalty && !empty($selectedReward['image'])
+        ? loyalty_reserve_stock($conn, (string)$rewardId) : null;
+    $pointsPending = 0;
 
     $paymentProof = $paymentMethod === 'Cash' ? null : store_payment_proof();
 
@@ -191,7 +139,7 @@ try {
     $seenProductIds = [];
 
     $productStmt = $conn->prepare(
-        'SELECT product_id, name, price, is_available' . ($stockSupported ? ', stock' : '') . "
+        'SELECT product_id, name, category, price, is_available' . ($stockSupported ? ', stock' : '') . "
          FROM products
          WHERE product_id = ?
          LIMIT 1
@@ -261,6 +209,7 @@ try {
             );
         }
 
+        if (in_array($product['category'], ['Hot', 'Iced'], true) && $priceCents > 0) $pointsPending += $quantity;
         $lineTotalCents = $priceCents * $quantity;
         $realSubtotalCents += $lineTotalCents;
         if ($realSubtotalCents > 9999999999) {
@@ -277,6 +226,12 @@ try {
     }
 
     $maxDiscountCents = (int)round($realSubtotalCents * 0.20);
+    if ($redeemLoyalty) {
+        if ($realSubtotalCents <= $selectedReward['cents'] || $submittedDiscountCents !== $selectedReward['cents'] || $discountProof !== null) {
+            throw new RuntimeException('Your order must exceed the selected reward amount. Rewards cannot combine with the Senior / PWD discount.');
+        }
+        $maxDiscountCents = $selectedReward['cents'];
+    }
     $realTotalCents = $realSubtotalCents - $submittedDiscountCents;
 
     if (
@@ -351,10 +306,16 @@ try {
 
     $stmt->execute();
     $orderId = $conn->insert_id;
+    $rewardLabel = $selectedReward['label'] ?? null;
+    $rewardImage = $selectedReward['image'] ?? null;
+    $loyalty = $conn->prepare('INSERT INTO order_loyalty (order_id, points_pending, reward_label, reward_image, inventory_reward_id) VALUES (?, ?, ?, ?, ?)');
+    $loyalty->bind_param('iisss', $orderId, $pointsPending, $rewardLabel, $rewardImage, $inventoryRewardId);
+    $loyalty->execute();
+    if ($redeemLoyalty) loyalty_record($conn, $customerId, $orderId, 'Redeem', -$selectedReward['points']);
     $paymentReview = $paymentMethod === 'Cash' ? 'Not required' : 'Pending';
-    $idReview = $realDiscount > 0 ? 'Pending' : 'Not required';
-    $meta = $conn->prepare('UPDATE orders SET pickup_at = ?, payment_review = ?, id_review = ? WHERE order_id = ?');
-    $meta->bind_param('sssi', $pickupAt, $paymentReview, $idReview, $orderId);
+    $idReview = $realDiscount > 0 && !$redeemLoyalty ? 'Pending' : 'Not required';
+    $meta = $conn->prepare('UPDATE orders SET pickup_at = ?, payment_review = ?, id_review = ?, fulfillment_method = ?, delivery_address = ? WHERE order_id = ?');
+    $meta->bind_param('sssssi', $pickupAt, $paymentReview, $idReview, $fulfillmentMethod, $deliveryAddress, $orderId);
     $meta->execute();
     $history = $conn->prepare("INSERT INTO order_status_history (order_id, status) VALUES (?, 'Placed')");
     $history->bind_param('i', $orderId); $history->execute();
@@ -410,45 +371,39 @@ try {
         }
     }
 
+    $newLoyaltyBalance = loyalty_balance($conn, $customerId);
+    $updatedRewards = loyalty_rewards($conn);
     $conn->commit();
 
     respond([
         'ok' => true,
         'order_id' => $orderId,
         'total' => $realTotal,
-        'payment_method' => $paymentMethod
+        'payment_method' => $paymentMethod,
+        'loyalty_balance' => $newLoyaltyBalance,
+        'rewards' => $updatedRewards,
+        'points_pending' => $pointsPending
     ]);
-} catch (RuntimeException $e) {
+} catch (Throwable $e) {
     try {
         $conn->rollback();
     } catch (Throwable $rollbackError) {
         error_log('Order rollback error: ' . $rollbackError->getMessage());
     }
 
-    if ($discountProof !== null) {
-        @unlink(__DIR__ . '/../' . $discountProof);
-    }
-    if ($paymentProof !== null) {
-        @unlink(__DIR__ . '/../' . $paymentProof);
-    }
-
-    respond(['ok' => false, 'message' => $e->getMessage()], 400);
-} catch (Throwable $e) {
-    try {
-        $conn->rollback();
-    } catch (Throwable $ignored) {
+    // Both proof files must be removed when the order cannot be saved.
+    foreach ([$discountProof, $paymentProof] as $proof) {
+        if ($proof !== null) {
+            @unlink(__DIR__ . '/../' . $proof);
+        }
     }
 
-    if ($discountProof !== null) {
-        @unlink(__DIR__ . '/../' . $discountProof);
-    }
-    if ($paymentProof !== null) {
-        @unlink(__DIR__ . '/../' . $paymentProof);
+    if ($e instanceof RuntimeException && !($e instanceof mysqli_sql_exception)) {
+        respond(['ok' => false, 'message' => $e->getMessage()], 400);
     }
 
     error_log('Order processing error: ' . $e->getMessage());
-
-    if ($e instanceof mysqli_sql_exception && (int) $e->getCode() === 1452) {
+    if ($e instanceof mysqli_sql_exception && (int)$e->getCode() === 1452) {
         respond([
             'ok' => false,
             'message' => 'Your customer account could not be found. Please sign in again.'

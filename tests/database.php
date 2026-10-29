@@ -24,10 +24,13 @@ function import_test_sql(mysqli $conn, string $sql): void {
 $fresh = file_get_contents(__DIR__ . '/../database.sql');
 $update = file_get_contents(__DIR__ . '/../database_update.sql');
 try {
+    preg_match_all('/^CREATE TABLE IF NOT EXISTS \w+ \(.*?^\) ENGINE=InnoDB;/ms', $fresh, $freshTables);
+    preg_match_all('/^CREATE TABLE IF NOT EXISTS \w+ \(.*?^\) ENGINE=InnoDB;/ms', $update, $updateTables);
+    verify($freshTables[0] === $updateTables[0], 'Fresh-install and update table definitions match');
     import_test_sql($testConn, $fresh);
     $count = (int)$testConn->query('SELECT COUNT(*) n FROM products')->fetch_assoc()['n'];
     verify($count === 40, 'Fresh import creates all 40 menu products');
-    verify($testConn->query('SHOW TABLES')->num_rows === 10, 'Fresh import creates all 10 project tables');
+    verify($testConn->query('SHOW TABLES')->num_rows === 13, 'Fresh import creates all 13 project tables');
     import_test_sql($testConn, $fresh);
     verify((int)$testConn->query('SELECT COUNT(*) n FROM products')->fetch_assoc()['n'] === $count, 'Repeated fresh import does not duplicate menu products');
     import_test_sql($testConn, $update);
@@ -38,7 +41,7 @@ try {
     $testConn->select_db($testDatabase);
     preg_match_all('/^CREATE TABLE IF NOT EXISTS (admins|customers|products|orders|order_items) \(.*?^\) ENGINE=InnoDB;/ms', $fresh, $matches);
     $legacySchema = implode("\n", $matches[0]);
-    $legacySchema = preg_replace('/^    (?:password_hash VARCHAR\(255\) DEFAULT NULL|address |updated_at |stock |payment_method |payment_proof |pickup_at |payment_review |payment_review_reason |id_review |id_review_reason ).*\R/m', '', $legacySchema);
+    $legacySchema = preg_replace('/^    (?:password_hash VARCHAR\(255\) DEFAULT NULL|address |updated_at |stock |delivery_tracking_url |fulfillment_method |delivery_address |payment_method |payment_proof |pickup_at |payment_review |payment_review_reason |id_review |id_review_reason ).*\R/m', '', $legacySchema);
     $legacySchema = str_replace("ENUM('Placed','Preparing','Ready','Served','Delivered','Completed','Cancelled')", "ENUM('Placed','Completed','Cancelled')", $legacySchema);
     $legacySchema = preg_replace('/,\s*\) ENGINE=InnoDB;/', "\n) ENGINE=InnoDB;", $legacySchema);
     import_test_sql($testConn, $legacySchema);
@@ -48,7 +51,7 @@ try {
     $testConn->query("INSERT INTO orders (customer_id,subtotal,discount,total,cash_received,change_amount,status) VALUES (1,777,0,777,800,23,'Completed')");
     $testConn->query("INSERT INTO order_items (order_id,product_id,product_name,quantity,unit_price,line_total) VALUES (1,1,'Americano',1,777,777)");
     import_test_sql($testConn, $update);
-    verify($testConn->query('SHOW TABLES')->num_rows === 10, 'Update upgrades a legacy five-table database');
+    verify($testConn->query('SHOW TABLES')->num_rows === 13, 'Update upgrades a legacy five-table database');
     verify($testConn->query("SELECT password_hash FROM admins WHERE admin_id=1")->fetch_assoc()['password_hash'] === 'unchanged-password-hash', 'Admin credentials are preserved');
     $product = $testConn->query('SELECT * FROM products WHERE product_id=1')->fetch_assoc();
     verify($product['price'] === '777.00' && $product['image_url'] === 'custom.jpg' && $product['description'] === 'Keep my custom description', 'Existing menu prices, photos, and descriptions are preserved');

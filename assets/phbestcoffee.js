@@ -11,6 +11,25 @@ $(function () {
     const $checkout = $('#checkout-modal');
     const $confirmation = $('#confirmation-modal');
     const signedIn = String($drawer.data('signed-in')) === '1';
+    const $loyalty = $('#loyalty-program');
+    let rewards = $loyalty.data('rewards') || {};
+    const cupIds = new Set($loyalty.data('cup-ids') || []);
+    let loyaltyBalance = Number($loyalty.data('balance')) || 0;
+
+    function selectedReward() {
+        return rewards[$('#loyalty-reward').val()] || rewards['10'];
+    }
+
+    function updateLoyaltyBalance(balance) {
+        loyaltyBalance = Number(balance) || 0;
+        $('#loyalty-balance').text(loyaltyBalance);
+        const unavailable = loyaltyBalance < selectedReward().points || selectedReward().stock === 0;
+        const selected = selectedReward();
+        $('#reward-stock-note').text(selected.image ? (selected.stock === null ? 'Available' : selected.stock === 0 ? 'Sold out' : selected.stock + ' left available') : '');
+        $('#redeem-loyalty').prop('disabled', unavailable);
+        if (unavailable) $('#redeem-loyalty').prop('checked', false);
+        refreshCheckoutTotals();
+    }
 
     const paymentMethods = {
         Cash: {
@@ -532,9 +551,15 @@ $(function () {
 
     function totalsNow() {
         const subCents = subtotalCents();
-        const discountCents = $('#senior-pwd').is(':checked') ? Math.round(subCents * 0.2) : 0;
+        const reward = $('#redeem-loyalty').is(':checked');
+        const choice = selectedReward();
+        const discountCents = reward ? Math.min(choice.cents, subCents) : ($('#senior-pwd').is(':checked') ? Math.round(subCents * 0.2) : 0);
 
         return {
+            reward,
+            rewardPoints: choice.points,
+            rewardLabel: choice.label,
+            rewardImage: choice.image || '',
             sub: subCents / 100,
             discount: discountCents / 100,
             total: (subCents - discountCents) / 100
@@ -562,6 +587,12 @@ $(function () {
     function refreshCheckoutTotals() {
         const totals = totalsNow();
 
+        const cups = cart.reduce((sum, item) => sum + (cupIds.has(Number(item.id)) ? item.quantity : 0), 0);
+        $('#loyalty-estimate').text('This order earns ' + cups + ' point(s) after fulfillment.');
+        $('#receipt-discount-label').text(totals.reward ? 'Loyalty reward (' + totals.rewardPoints + ' points)' : 'Senior / PWD discount');
+        const merchandise = totals.reward && totals.rewardImage;
+        $('#receipt-merchandise').toggleClass('d-none', !merchandise);
+        $('#receipt-merchandise-name').text(merchandise ? totals.rewardLabel + ' · ' + totals.rewardPoints + ' points' : '');
         $('#receipt-subtotal').text(peso(totals.sub));
         $('#receipt-total').text(peso(totals.total));
         $('#receipt-discount-row').toggleClass('d-none', totals.discount <= 0);
@@ -661,6 +692,17 @@ $(function () {
         return input && input.files && input.files[0] ? input.files[0] : null;
     }
 
+    function resetCheckoutFields() {
+        $('#redeem-loyalty').prop('checked', false);
+        $('#senior-pwd').prop('checked', false).trigger('change');
+        $('#cash-amount').val('');
+        $('#pickup-at').val('');
+        $('input[name="fulfillment-method"][value="Pickup"]').prop('checked', true).trigger('change');
+        $('#delivery-address').val('');
+        $('#qr-confirm').prop('checked', false);
+        resetProof();
+    }
+
     function openCheckout() {
         if (!cart.length) {
             showToast('Your cart is empty.', { icon: '!', tone: 'warning' });
@@ -673,13 +715,10 @@ $(function () {
         }
 
         renderCheckout();
-        $('#senior-pwd').prop('checked', false).trigger('change');
-        $('#cash-amount').val('');
-        $('#pickup-at').val('');
-        $('#qr-confirm').prop('checked', false);
-        resetProof();
+        resetCheckoutFields();
         hideCheckoutError();
 
+        $.getJSON('customer/loyalty.php').done(data => { rewards = data.rewards; updateLoyaltyBalance(data.balance); });
         closeCart({ restoreFocus: false });
         $checkout.addClass('is-open').attr('aria-hidden', 'false');
         syncScrollLock();
@@ -718,8 +757,31 @@ $(function () {
         if (discountPreviewUrl) URL.revokeObjectURL(discountPreviewUrl);
         discountPreviewUrl = null;
     }
+    function fulfillmentMethod() {
+        return $('input[name="fulfillment-method"]:checked').val() || 'Pickup';
+    }
+    $('input[name="fulfillment-method"]').on('change', function () {
+        const delivery = fulfillmentMethod() === 'Delivery';
+        $('#delivery-address-panel').toggleClass('d-none', !delivery);
+        $('#delivery-address').prop('required', delivery);
+        $('#pickup-time-panel').toggleClass('d-none', delivery);
+        $('#pickup-at').prop('disabled', delivery);
+        if (delivery) $('#pickup-at').val('');
+    });
+    $('#loyalty-reward').on('change', function () {
+        const reward = selectedReward();
+        $('#reward-merchandise-preview').toggleClass('d-none', !reward.image);
+        if (reward.image) $('#reward-merchandise-preview img').attr('src', reward.image).attr('alt', reward.label);
+        $('#reward-merchandise-preview span').text(reward.label);
+        updateLoyaltyBalance(loyaltyBalance);
+    });
+    $('#redeem-loyalty').on('change', function () {
+        if ($(this).is(':checked')) $('#senior-pwd').prop('checked', false).trigger('change');
+        refreshCheckoutTotals();
+    });
     $('#senior-pwd').on('change', function () {
         const enabled = $(this).is(':checked');
+        if (enabled) $('#redeem-loyalty').prop('checked', false);
         $('#discount-proof-upload').toggleClass('d-none', !enabled);
         $('#discount-proof').prop('required', enabled);
         if (!enabled) resetDiscountProof();
@@ -779,7 +841,11 @@ $(function () {
     $('.cash-quick').on('click', 'button', function () {
         const value = String($(this).attr('data-cash'));
 
-        $('#cash-amount').val(value === 'exact' ? totalsNow().total.toFixed(2) : Number(value).toFixed(2));
+        const currentCents = inputAmountCents($('#cash-amount').val()) ?? 0;
+        const nextCents = value === 'exact'
+            ? toCents(totalsNow().total)
+            : Math.min(currentCents + toCents(Number(value)), 9999999999);
+        $('#cash-amount').val((nextCents / 100).toFixed(2));
         updateCashFeedback();
     });
 
@@ -832,6 +898,17 @@ $(function () {
             $button.data('busy', false).prop('disabled', false).html(confirmLabel());
             return;
         }
+        if (fulfillmentMethod() === 'Delivery' && !$('#delivery-address').val().trim()) {
+            showCheckoutError('Enter your complete delivery address.');
+            $('#delivery-address').trigger('focus');
+            $button.data('busy', false).prop('disabled', false).html(confirmLabel());
+            return;
+        }
+        if (totals.reward && (loyaltyBalance < selectedReward().points || toCents(totals.sub) <= selectedReward().cents)) {
+            showCheckoutError('You need enough points, and your order total must exceed the selected reward amount.');
+            $button.data('busy', false).prop('disabled', false).html(confirmLabel());
+            return;
+        }
         const discountFile = document.getElementById('discount-proof').files[0];
         if ($('#senior-pwd').is(':checked') && !discountFile) {
             showCheckoutError('Upload your Senior or PWD ID photo to use the discount.');
@@ -849,10 +926,14 @@ $(function () {
             })),
             subtotal: totals.sub,
             discount: totals.discount,
+            redeem_loyalty: totals.reward,
+            loyalty_reward: $('#loyalty-reward').val(),
             total: totals.total,
             cash_received: cash,
             payment_method: paymentMethod,
-            pickup_at: document.getElementById('pickup-at').value
+            pickup_at: fulfillmentMethod() === 'Pickup' ? document.getElementById('pickup-at').value : '',
+            fulfillment_method: fulfillmentMethod(),
+            delivery_address: fulfillmentMethod() === 'Delivery' ? $('#delivery-address').val().trim() : ''
         }));
 
         const proofFile = paymentMethod === 'Cash' ? null : selectedProofFile();
@@ -872,6 +953,8 @@ $(function () {
                 return;
             }
 
+            rewards = savedOrder.rewards || rewards;
+            updateLoyaltyBalance(savedOrder.loyalty_balance);
             completeOrder(savedOrder.order_id, totals, cash, change, paymentMethod);
         })
         .fail(function (xhr) {
@@ -944,8 +1027,11 @@ $(function () {
         };
 
         appendTotal('Subtotal', peso(totals.sub));
+        if (totals.reward && totals.rewardImage) {
+            appendTotal('Reward: ' + totals.rewardLabel, totals.rewardPoints + ' points', 'receipt-discount');
+        }
         if (totals.discount > 0) {
-            appendTotal('Senior / PWD discount', '−' + peso(totals.discount), 'receipt-discount');
+            appendTotal(totals.reward ? 'Loyalty reward (' + totals.rewardPoints + ' points)' : 'Senior / PWD discount', '−' + peso(totals.discount), 'receipt-discount');
         }
         appendTotal('Total', peso(totals.total), 'receipt-grand-total');
 
@@ -978,11 +1064,7 @@ $(function () {
         updateCount();
 
         $('#checkout-modal').removeClass('is-open').attr('aria-hidden', 'true');
-        $('#cash-amount').val('');
-        $('#pickup-at').val('');
-        $('#senior-pwd').prop('checked', false).trigger('change');
-        $('#qr-confirm').prop('checked', false);
-        resetProof();
+        resetCheckoutFields();
         $('#cash-feedback').removeClass('is-ok is-short').addClass('is-hint')
             .text('Enter the cash handed over to compute change.');
         hideCheckoutError();

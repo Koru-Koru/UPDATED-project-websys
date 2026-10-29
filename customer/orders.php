@@ -20,6 +20,7 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 <!doctype html>
 <html lang="en">
 <head>
+    <?php account_theme_init(); ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -30,6 +31,7 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         rel="stylesheet"
     >
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
+    <?php account_theme_assets(); ?>
 </head>
 
 <body class="account-body">
