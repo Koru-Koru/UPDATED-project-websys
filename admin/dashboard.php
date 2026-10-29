@@ -15,6 +15,7 @@ require_once __DIR__ . '/../includes/loyalty.php';
 ensure_merchandise_collection_table($conn);
 $orderSummary = $conn->query("SELECT SUM(payment_method = 'Cash' AND cash_received < total AND status <> 'Cancelled') AS awaiting_cash, SUM(status = 'Preparing') AS preparing, SUM(payment_method <> 'Cash' AND payment_review = 'Pending' AND status <> 'Cancelled') AS pending_review FROM orders")->fetch_assoc();
 $waitingMerchandise = (int)$conn->query("SELECT COUNT(*) FROM loyalty_transactions t LEFT JOIN merchandise_collections m ON m.transaction_id = t.transaction_id WHERE t.kind = 'Redeem' AND t.order_id IS NULL AND t.reason LIKE 'Merchandise: %' AND COALESCE(m.status, 'Waiting') = 'Waiting'")->fetch_row()[0];
+$pendingRecoveryRequests = (int)$conn->query('SELECT COUNT(*) FROM customer_recovery_requests')->fetch_row()[0];
 ?>
 <!doctype html>
 <html lang="en">
@@ -36,8 +37,17 @@ $waitingMerchandise = (int)$conn->query("SELECT COUNT(*) FROM loyalty_transactio
     <h1 class="h2 mb-4 text-center">Admin Dashboard</h1>
     <div class="dashboard-shortcuts d-flex flex-wrap justify-content-center gap-2 mb-4">
         <a href="settings.php" class="btn btn-outline-coffee">Password settings</a>
-        <a href="reward_stock.php" class="btn btn-outline-coffee">Merchandise stock</a>
-        <a href="recovery.php" class="btn btn-outline-coffee">Customer recovery requests</a>
+        <a href="reward_stock.php<?= $waitingMerchandise > 0 ? '?collection=Waiting#merchandise-orders' : '' ?>" class="btn btn-outline-coffee">
+            Merchandise stock
+            <?php if ($waitingMerchandise > 0): ?>
+                <span class="badge text-bg-warning rounded-pill ms-2"><?= $waitingMerchandise ?> waiting<span class="visually-hidden"> for merchandise collection</span></span>
+            <?php endif; ?>
+        </a>
+        <a href="recovery.php" class="btn btn-outline-coffee">Customer recovery requests
+            <?php if ($pendingRecoveryRequests > 0): ?>
+                <span class="badge text-bg-warning rounded-pill ms-2"><?= $pendingRecoveryRequests ?> pending</span>
+            <?php endif; ?>
+        </a>
         <a href="analytics.php" class="btn btn-outline-coffee">Reports and CSV export</a>
         <a href="activity.php" class="btn btn-outline-coffee">Admin activity</a>
         <a href="backup.php" class="btn btn-outline-coffee">Database backup</a>

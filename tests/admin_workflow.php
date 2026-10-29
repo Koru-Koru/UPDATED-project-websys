@@ -52,6 +52,9 @@ try {
     $test->query("UPDATE reward_inventory SET stock = 1 WHERE reward_id = '30'");
     $redemption = redeem_merchandise($test, $customer, '30');
     verify_admin_workflow($redemption > 0 && loyalty_balance($test, $customer) === 20, 'Merchandise redemption creates a number and deducts points');
+    verify_admin_workflow(loyalty_held_points($test, $customer) === 30, 'Waiting merchandise points are on hold');
+    $test->query("INSERT INTO merchandise_collections (transaction_id, status) VALUES ($redemption, 'Received')");
+    verify_admin_workflow(loyalty_held_points($test, $customer) === 0 && loyalty_balance($test, $customer) === 20, 'Collection clears hold without deducting points again');
     verify_admin_workflow((int)$test->query("SELECT stock FROM reward_inventory WHERE reward_id = '30'")->fetch_row()[0] === 0, 'Merchandise redemption reserves stock');
     loyalty_adjust($test, $customer, (int)$_SESSION['admin_id'], 30, 'Restock test points');
     $blocked = false;

@@ -879,6 +879,11 @@ $(function () {
             $button.data('busy', false).prop('disabled', false).html(confirmLabel());
             return;
         }
+        if (totals.reward && toCents(totals.sub) < (selectedReward().minimum_spend_cents || 0)) {
+            showCheckoutError('This reward requires a minimum spend of ' + peso(selectedReward().minimum_spend_cents / 100) + ' before discounts.');
+            $button.data('busy', false).prop('disabled', false).html(confirmLabel());
+            return;
+        }
         if (totals.reward && (loyaltyBalance < selectedReward().points || toCents(totals.sub) <= selectedReward().cents)) {
             showCheckoutError('You need enough points, and your order total must exceed the selected reward amount.');
             $button.data('busy', false).prop('disabled', false).html(confirmLabel());

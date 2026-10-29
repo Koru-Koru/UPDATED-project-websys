@@ -27,8 +27,10 @@ PROJECT FEATURES
   a manual stock check because they have no reservation records.
 - Sales analytics and date-filtered CSV exports (cancelled orders excluded).
 - Admin password changes and staff-assisted customer password recovery.
-  Staff verify identity and share a single-use reset link valid for 30 minutes.
-  Automatic email delivery is not configured.
+  Staff verify identity and email a single-use reset link valid for 30 minutes.
+  Configure Gmail SMTP in includes/mail.local.php using mail.example.php.
+  Enter the sender Gmail address, Gmail app password, and public HTTPS app_url.
+  The local config is excluded from Git. Update app_url when a tunnel URL changes.
 - Admin Orders > View Order: save a rider or courier tracking URL. The customer sees
   a Track delivery button in their order details; it updates with order progress.
 - Checkout offers Pickup or Delivery. Delivery requires a complete address, saved

@@ -271,7 +271,7 @@ function render_products(array $items): void {
             <select id="loyalty-reward" class="form-select mb-2">
               <option value="" selected disabled>Choose an available reward</option>
               <?php foreach (loyalty_rewards($conn) as $rewardId => $reward): ?>
-                <option value="<?= $rewardId ?>" <?= $loyaltyBalance < $reward['points'] || ($reward['stock'] ?? null) === 0 ? 'disabled' : '' ?>><?= $reward['points'] ?> points · <?= h($reward['label']) ?></option>
+                <option value="<?= $rewardId ?>" <?= $loyaltyBalance < $reward['points'] || ($reward['stock'] ?? null) === 0 ? 'disabled' : '' ?>><?= $reward['points'] ?> points · <?= h($reward['label']) ?><?= !empty($reward['minimum_spend_cents']) ? ' · ₱' . number_format($reward['minimum_spend_cents'] / 100, 0) . ' minimum spend' : '' ?></option>
               <?php endforeach; ?>
             </select>
             <p id="reward-stock-note" class="small fw-semibold" aria-live="polite"></p>

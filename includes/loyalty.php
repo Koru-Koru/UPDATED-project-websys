@@ -15,8 +15,8 @@ function ensure_merchandise_collection_table(mysqli $conn): void {
 function loyalty_rewards(?mysqli $conn = null): array {
     $rewards = [
         '5' => ['points' => 5, 'cents' => 2000, 'label' => '₱20 off'],
-        '10' => ['points' => 10, 'cents' => 5000, 'label' => '₱50 off'],
-        '20' => ['points' => 20, 'cents' => 10000, 'label' => '₱100 off'],
+        '10' => ['points' => 10, 'cents' => 5000, 'minimum_spend_cents' => 10000, 'label' => '₱50 off'],
+        '20' => ['points' => 20, 'cents' => 10000, 'minimum_spend_cents' => 15000, 'label' => '₱100 off'],
         '30' => ['points' => 30, 'cents' => 0, 'label' => 'Phbestcoffee mug', 'image' => 'assets/merchandise/coffee-mug-brand-logo.png'],
         '50' => ['points' => 50, 'cents' => 0, 'label' => 'Phbestcoffee flask', 'image' => 'assets/merchandise/coffee-flask-brand-logo.png']
     ];
@@ -30,11 +30,23 @@ function loyalty_rewards(?mysqli $conn = null): array {
     return $rewards;
 }
 
+// Available balance excludes merchandise reservations recorded at acceptance.
+// Collection finalizes the existing reservation; it must never deduct twice.
 function loyalty_balance(mysqli $conn, int $customerId): int {
     $stmt = $conn->prepare('SELECT COALESCE(SUM(points), 0) AS balance FROM loyalty_transactions WHERE customer_id = ?');
     $stmt->bind_param('i', $customerId);
     $stmt->execute();
     return (int)$stmt->get_result()->fetch_assoc()['balance'];
+}
+
+function loyalty_held_points(mysqli $conn, int $customerId): int {
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(-t.points), 0) FROM loyalty_transactions t
+        LEFT JOIN merchandise_collections m ON m.transaction_id = t.transaction_id
+        WHERE t.customer_id = ? AND t.kind = 'Redeem' AND t.order_id IS NULL
+        AND t.reason LIKE 'Merchandise: %' AND COALESCE(m.status, 'Waiting') = 'Waiting'");
+    $stmt->bind_param('i', $customerId);
+    $stmt->execute();
+    return (int)$stmt->get_result()->fetch_row()[0];
 }
 
 // Every balance-changing operation takes the same customer row lock first.

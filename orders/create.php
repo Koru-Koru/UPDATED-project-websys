@@ -246,6 +246,9 @@ try {
 
     $maxDiscountCents = (int)round($realSubtotalCents * 0.20);
     if ($redeemLoyalty) {
+        if ($realSubtotalCents < ($selectedReward['minimum_spend_cents'] ?? 0)) {
+            throw new RuntimeException('This reward requires a minimum spend of ₱' . number_format($selectedReward['minimum_spend_cents'] / 100, 2) . ' before discounts.');
+        }
         if ($realSubtotalCents <= $selectedReward['cents'] || $submittedDiscountCents !== $selectedReward['cents'] || $discountProof !== null) {
             throw new RuntimeException('Your order must exceed the selected reward amount. Rewards cannot combine with the Senior / PWD discount.');
         }

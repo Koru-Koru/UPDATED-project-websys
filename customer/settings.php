@@ -16,12 +16,43 @@ if (!$customer) {
     exit('Customer account not found.');
 }
 
+$addressFields = [
+    'street' => ['label' => 'House / Unit and Street', 'autocomplete' => 'shipping address-line1', 'max' => 80],
+    'barangay' => ['label' => 'Barangay', 'autocomplete' => 'shipping address-line2', 'max' => 50],
+    'city' => ['label' => 'City / Municipality', 'autocomplete' => 'shipping address-level2', 'max' => 50],
+    'province' => ['label' => 'Province / Metro Manila', 'autocomplete' => 'shipping address-level1', 'max' => 50],
+    'landmark' => ['label' => 'Nearby Landmark (optional)', 'autocomplete' => 'off', 'max' => 80],
+    'zip' => ['label' => 'ZIP Code', 'autocomplete' => 'shipping postal-code', 'max' => 4],
+];
+$savedAddress = preg_split('/\R/u', (string)($customer['address'] ?? ''));
+$addressParts = array_fill_keys(array_keys($addressFields), '');
+if (count($savedAddress) >= 4) {
+    $addressParts = array_combine(array_keys($addressFields), array_pad(array_slice($savedAddress, 0, 6), 6, ''));
+} else {
+    $addressParts['street'] = (string)($customer['address'] ?? '');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
     $name = trim($_POST['full_name'] ?? '');
     $email = strtolower(trim($_POST['email'] ?? ''));
     $phone = trim($_POST['phone'] ?? '');
-    $address = trim($_POST['address'] ?? '');
+    foreach ($addressFields as $key => $field) {
+        $value = $_POST['address_' . $key] ?? '';
+        $addressParts[$key] = is_string($value) ? trim($value) : '';
+        if (($key !== 'landmark' && $addressParts[$key] === '') ||
+            mb_strlen($addressParts[$key], 'UTF-8') > $field['max'] ||
+            preg_match('/[\r\n]/', $addressParts[$key])) {
+            $errors[] = 'Enter a valid ' . $field['label'] . ' (up to ' . $field['max'] . ' characters).';
+        }
+    }
+    if (!preg_match('/^[0-9]{4}$/D', $addressParts['zip'])) {
+        $errors[] = 'Enter a valid 4-digit ZIP code.';
+    }
+    $address = implode("\n", $addressParts);
+    if (mb_strlen($address, 'UTF-8') > 255) {
+        $errors[] = 'Keep the complete delivery address within 255 characters. Shorten the street or landmark if needed.';
+    }
 
     $currentPassword = $_POST['current_password'] ?? '';
     $newPassword = $_POST['new_password'] ?? '';
@@ -195,15 +226,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 >
             </div>
 
-            <div class="mb-4">
-                <label for="address" class="form-label">Delivery/Contact Address</label>
-                <textarea
-                    id="address"
-                    name="address"
-                    class="form-control"
-                    rows="2"
-                ><?= h($customer['address']) ?></textarea>
-            </div>
+            <fieldset class="mb-4">
+                <legend class="h5 mt-4">Delivery / Contact Address</legend>
+                <p class="small text-secondary">Fields marked * are required. Include your city / municipality, province, and ZIP code.</p>
+                <div class="row g-3">
+                    <?php foreach (['street', 'barangay', 'city', 'province', 'zip', 'landmark'] as $key): ?>
+                        <?php $field = $addressFields[$key]; ?>
+                        <div class="<?= in_array($key, ['street', 'landmark'], true) ? 'col-12' : 'col-md-6' ?>">
+                            <label for="address-<?= h($key) ?>" class="form-label"><?= h($field['label']) ?><?= $key !== 'landmark' ? ' *' : '' ?></label>
+                            <input id="address-<?= h($key) ?>" name="address_<?= h($key) ?>" class="form-control"
+                                   value="<?= h($addressParts[$key]) ?>" maxlength="<?= $field['max'] ?>"
+                                   autocomplete="<?= h($field['autocomplete']) ?>" <?= $key === 'zip' ? 'inputmode="numeric" pattern="[0-9]{4}" placeholder="e.g. 1920"' : '' ?> <?= $key !== 'landmark' ? 'required' : '' ?>>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </fieldset>
 
             <hr>
 
