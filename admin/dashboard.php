@@ -44,15 +44,20 @@ $customerCount = (int) $conn
 </nav>
 
 <main class="container py-4">
-    <h1 class="h2 mb-4">Admin Dashboard</h1>
-    <div class="dashboard-shortcuts d-flex flex-wrap gap-2 mb-4">
+    <h1 class="h2 mb-4 text-center">Admin Dashboard</h1>
+    <div class="dashboard-shortcuts d-flex flex-wrap justify-content-center gap-2 mb-4">
         <a href="settings.php" class="btn btn-outline-coffee">Password settings</a>
         <a href="reward_stock.php" class="btn btn-outline-coffee">Mug &amp; flask stock</a>
         <a href="recovery.php" class="btn btn-outline-coffee">Customer recovery requests</a>
         <a href="analytics.php" class="btn btn-outline-coffee">Reports and CSV export</a>
     </div>
     <?php
-    $lowStock = $conn->query('SELECT product_id, name, stock FROM products WHERE stock IS NOT NULL AND stock <= 10 ORDER BY stock, name')->fetch_all(MYSQLI_ASSOC);
+    $stockCategories = [
+        'Hot' => ['label' => 'Hot drinks', 'icon' => '<path d="M5 10h12v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M17 11h1a3 3 0 1 1 0 6h-1M8 3v3m4-3v3m4-3v3"/>'],
+        'Iced' => ['label' => 'Iced drinks', 'icon' => '<path d="M7 8h12l-2 13H9zM6 8h14M13 8l2-6h4"/><path d="M10 12h3v3h-3zm4 4h2"/>'],
+        'Snacks and Bites' => ['label' => 'Snacks & Bites', 'icon' => '<path d="M21 12a9 9 0 1 1-9-9 4 4 0 0 0 5 5 4 4 0 0 0 4 4z"/><circle cx="8" cy="9" r=".7"/><circle cx="8" cy="15" r=".7"/><circle cx="13" cy="12" r=".7"/><circle cx="15" cy="17" r=".7"/>']
+    ];
+    $lowStock = $conn->query('SELECT product_id, name, category, stock FROM products WHERE stock IS NOT NULL AND stock <= 10 ORDER BY stock, name')->fetch_all(MYSQLI_ASSOC);
     ?>
     <section class="stock-panel mb-4">
                 <div class="stock-panel-heading">
@@ -62,8 +67,12 @@ $customerCount = (int) $conn
         <div class="stock-list">
         <?php if (!$lowStock): ?><p class="mb-0">All tracked products have healthy stock levels.</p><?php endif; ?>
         <?php foreach ($lowStock as $item): ?>
+            <?php $category = $stockCategories[$item['category']]; ?>
             <div class="stock-item">
-                <a class="stock-product" href="products.php?edit=<?= (int)$item['product_id'] ?>"><span class="stock-product-icon" aria-hidden="true">☕</span><span><?= h($item['name']) ?><small>View product &amp; restock</small></span></a>
+                <a class="stock-product" href="products.php?edit=<?= (int)$item['product_id'] ?>">
+                    <span class="stock-product-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><?= $category['icon'] ?></svg></span>
+                    <span><?= h($item['name']) ?><small class="stock-category"><?= h($category['label']) ?></small><small>View product &amp; restock</small></span>
+                </a>
                 <strong class="stock-status <?= (int)$item['stock'] <= 0 ? 'is-empty' : 'is-low' ?>"><?= (int)$item['stock'] <= 0 ? 'Sold out' : (int)$item['stock'] . ' left' ?></strong>
             </div>
         <?php endforeach; ?>

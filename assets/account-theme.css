@@ -203,3 +203,4 @@ html[data-coffee-theme="dark"] .loyalty-reward-option.is-ready { background: #28
 html[data-coffee-theme="dark"] .loyalty-reward-option span, html[data-coffee-theme="dark"] .loyalty-reward-option small { color: #c1b0a0; }
 html[data-coffee-theme="dark"] .customer-points-badge { background: #49382b; color: #ecc69e; }
 html[data-coffee-theme="dark"] .customer-records-table th { color: #c1ab96; }
+html[data-coffee-theme="dark"] .stock-product .stock-category { color: #ecc69e; }
