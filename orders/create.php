@@ -262,7 +262,7 @@ try {
         $cash = $cashCents / 100;
         $change = ($cashCents - $realTotalCents) / 100;
     } else {
-        // QR / bank transfer payments are made for the exact amount due.
+
         $cash = $realTotal;
         $change = 0.0;
     }
@@ -347,7 +347,7 @@ try {
 
     if ($stockSupported) {
         // The product rows were locked with FOR UPDATE above, so these
-        // decrements cannot oversell against a concurrent order.
+
         $stockStmt = $conn->prepare(
             'UPDATE products
              SET stock = stock - ?
@@ -391,7 +391,6 @@ try {
         error_log('Order rollback error: ' . $rollbackError->getMessage());
     }
 
-    // Both proof files must be removed when the order cannot be saved.
     foreach ([$discountProof, $paymentProof] as $proof) {
         if ($proof !== null) {
             @unlink(__DIR__ . '/../' . $proof);

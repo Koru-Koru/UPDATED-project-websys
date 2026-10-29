@@ -1,8 +1,7 @@
 <?php
-// A customer's balance is the sum of the points history, never a second copy.
+
 const LOYALTY_REWARD_POINTS = 10;
 
-// One catalogue is used by PHP validation, checkout, and the profile.
 function loyalty_rewards(?mysqli $conn = null): array {
     $rewards = [
         '5' => ['points' => 5, 'cents' => 2000, 'label' => '₱20 off'],

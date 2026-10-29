@@ -4,11 +4,10 @@ REQUIREMENTS
 - XAMPP (Apache, MySQL, PHP) and a browser.
 - Internet for Bootstrap, jQuery, fonts, and remote menu images.
 
-DATABASE SETUP - CHOOSE ONE
-1. First installation: import database.sql using phpMyAdmin.
-2. Already have the project database: import database_update.sql instead.
-   This single update includes all previous database changes and missing menu items.
-   You can import it again without duplicating the sample products or resetting data.
+DATABASE SETUP
+- Import database.sql in phpMyAdmin for either a new or existing installation.
+- This file creates missing tables and columns and adds missing menu items.
+- Repeat imports preserve existing accounts, orders, prices, stock, and rewards.
 
 OPEN THE PROJECT
 - Start Apache and MySQL in XAMPP.
@@ -30,7 +29,6 @@ PROJECT FEATURES
 - Admin password changes and staff-assisted customer password recovery.
   Staff verify identity and share a single-use reset link valid for 30 minutes.
   Automatic email delivery is not configured.
-
 - Admin Orders > View Order: save a rider or courier tracking URL. The customer sees
   a Track delivery button in their order details; it updates with order progress.
 - Checkout offers Pickup or Delivery. Delivery requires a complete address, saved
@@ -53,8 +51,8 @@ COFFEE REWARDS
   1 to 10,000 whole points with a required reason; balances cannot become negative.
   Manual changes record the admin and appear in the customer's points history.
 - Order details show earned/redeemed points.
-- The database update is already applied locally. Other installations import
-  database_update.sql; no separate loyalty update file is needed.
+- After downloading updates, import
+  database.sql; no separate loyalty update file is needed.
 
 REWARD STOCK
 - Admin Dashboard > Mug & flask stock lets staff set the available quantity.
@@ -62,7 +60,7 @@ REWARD STOCK
 - Quantities appear on the customer profile and checkout reward selection.
 - Checkout reserves one item using a database row lock. Failed orders roll back;
   cancelled orders restore their reserved item once. Existing stock is not reset
-  when database_update.sql is imported again.
+  when database.sql is imported again.
 
 CODE ORGANIZATION
 - includes/layout.php: shared page headers and footers.

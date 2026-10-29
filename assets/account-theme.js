@@ -1,4 +1,4 @@
-/* Loaded before the page paints so a saved dark theme does not flash white. */
+// Apply the saved theme before the page renders.
 (() => {
     'use strict';
     const key = 'phbestcoffee-theme';

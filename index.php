@@ -50,13 +50,11 @@ function render_products(array $items): void {
   <meta name="viewport" content="width=device-width, initial-scale=1" >
   <title>Philippines' Best Coffee</title>
 
-
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/assets/phbestcoffee.css') ?>">
 </head>
 <body class="site-body">
-
 
   <header class="site-header fixed-top shadow">
     <nav class="navbar navbar-expand-lg navbar-dark container px-3 px-lg-5 py-2">
@@ -97,7 +95,6 @@ function render_products(array $items): void {
     </nav>
   </header>
 
-
   <main>
     <section id="home" class="hero d-flex align-items-center justify-content-center text-center text-white">
       <div class="slideshow-container" aria-hidden="true">
@@ -114,24 +111,19 @@ function render_products(array $items): void {
       </div>
     </section>
 
-
     <section id="about" class="section-space bg-light text-center fade-in">
       <h3 class="title-font section-title fw-bold mb-4">Our Mission</h3>
       <p class="container about-copy text-secondary fs-5">To bring the finest Filipino-sourced coffee beans from mountain to cup — supporting our local farmers, promoting sustainability, and sharing the warmth of Filipino culture one brew at a time.</p>
     </section>
 
-
     <section id="menu" class="section-space bg-white text-center fade-in">
       <h3 class="title-font section-title fw-bold mb-5">Our Menu</h3>
-
 
       <div class="d-flex justify-content-center flex-wrap gap-2 mb-4 menu-tabs">
         <button class="tab-btn btn btn-outline-coffee active" data-tab="hot">Hot</button>
         <button class="tab-btn btn btn-outline-coffee" data-tab="iced">Iced</button>
         <button class="tab-btn btn btn-outline-coffee" data-tab="snacks">Snacks and Bites</button>
       </div>
-
-
 
       <div class="tab-content container product-grid" id="hot"><?php render_products($grouped['Hot']); ?></div>
       <div class="tab-content container product-grid d-none" id="iced"><?php render_products($grouped['Iced']); ?></div>
@@ -147,8 +139,6 @@ function render_products(array $items): void {
   <footer class="site-footer bg-dark text-light py-4 text-center fade-in">
     <p class="small mb-2">&copy; 2025 Philippines' Coffee. All rights reserved.</p><div class="d-flex justify-content-center flex-wrap gap-3 small"><a class="text-light text-decoration-none" href="customer/login.php">Customer Login</a><a class="text-light text-decoration-none" href="customer/register.php">Create Customer Account</a><a class="text-light text-decoration-none" href="admin/login.php">Admin Login</a></div>
   </footer>
-
-  <!-- ==================== CART DRAWER ==================== -->
   <div id="cart-backdrop" class="cart-backdrop" aria-hidden="true"></div>
 
   <aside id="cart-modal" class="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" aria-hidden="true"
@@ -185,8 +175,6 @@ function render_products(array $items): void {
       </div>
     </footer>
   </aside>
-
-  <!-- ==================== CHECKOUT ==================== -->
   <div id="checkout-modal" class="cart-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title" aria-hidden="true">
     <div class="cart-content checkout-content">
       <header class="overlay-header">
@@ -375,8 +363,6 @@ function render_products(array $items): void {
       </div>
     </div>
   </div>
-
-  <!-- ==================== CONFIRMATION ==================== -->
   <div id="confirmation-modal" class="cart-modal" role="dialog" aria-modal="true" aria-labelledby="confirmation-title" aria-hidden="true">
     <div class="cart-content confirmation-content">
       <div class="confirmation-banner">
@@ -397,7 +383,6 @@ function render_products(array $items): void {
   </div>
 
   <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
-
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>

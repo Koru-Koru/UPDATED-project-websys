@@ -4,7 +4,7 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 $host = 'localhost';
 $dbname = 'phbestcoffee_db';
 $username = 'root';
-$password = ''; // Default XAMPP MySQL password is usually blank.
+$password = '';
 
 try {
     $conn = new mysqli($host, $username, $password, $dbname);

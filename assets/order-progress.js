@@ -1,4 +1,3 @@
-/* Customer order details: refresh status and rider links without reloading. */
 (() => {
     'use strict';
 

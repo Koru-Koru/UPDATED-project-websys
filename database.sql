@@ -1,5 +1,5 @@
--- NEW INSTALLATION: import this file in phpMyAdmin.
--- Existing project database? Import database_update.sql instead.
+-- Import this file in phpMyAdmin for a new or existing installation.
+-- Safe to import again; existing accounts, orders, stock, and rewards are kept.
 CREATE DATABASE IF NOT EXISTS phbestcoffee_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE phbestcoffee_db;
 SET NAMES utf8mb4;
@@ -130,7 +130,206 @@ CREATE TABLE IF NOT EXISTS reward_inventory (
 ) ENGINE=InnoDB;
 INSERT INTO reward_inventory (reward_id, stock) SELECT '30', NULL WHERE NOT EXISTS (SELECT 1 FROM reward_inventory WHERE reward_id = '30');
 INSERT INTO reward_inventory (reward_id, stock) SELECT '50', NULL WHERE NOT EXISTS (SELECT 1 FROM reward_inventory WHERE reward_id = '50');
--- Sample menu. Existing products are kept unchanged on repeat imports.
+-- Add only the columns missing from an older database.
+
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE customers ADD COLUMN password_hash VARCHAR(255) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'password_hash'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE customers ADD COLUMN address VARCHAR(255) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'address'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE customers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'updated_at'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE products ADD COLUMN stock INT DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'stock'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN payment_method VARCHAR(20) NOT NULL DEFAULT ''Cash''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'payment_method'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN payment_proof VARCHAR(255) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'payment_proof'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN pickup_at DATETIME DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'pickup_at'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN payment_review VARCHAR(20) NOT NULL DEFAULT ''Pending''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'payment_review'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN payment_review_reason VARCHAR(500) NOT NULL DEFAULT ''''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'payment_review_reason'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN id_review VARCHAR(20) NOT NULL DEFAULT ''Not required''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'id_review'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN id_review_reason VARCHAR(500) NOT NULL DEFAULT ''''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'id_review_reason'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+-- Optional rider / courier tracking link, shared through the order details.
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN delivery_tracking_url VARCHAR(2048) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'delivery_tracking_url'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN fulfillment_method VARCHAR(20) NOT NULL DEFAULT ''Pickup''',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'fulfillment_method'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE orders ADD COLUMN delivery_address VARCHAR(500) DEFAULT NULL',
+        'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'delivery_address'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE order_loyalty ADD COLUMN reward_label VARCHAR(100) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_loyalty' AND COLUMN_NAME = 'reward_label'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE order_loyalty ADD COLUMN reward_image VARCHAR(255) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_loyalty' AND COLUMN_NAME = 'reward_image'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+-- Allow admin adjustments without creating a fake order.
+ALTER TABLE loyalty_transactions
+    MODIFY order_id INT DEFAULT NULL,
+    MODIFY kind ENUM('Earn','Redeem','Refund','Adjust') NOT NULL;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE loyalty_transactions ADD COLUMN reason VARCHAR(255) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'loyalty_transactions' AND COLUMN_NAME = 'reason'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE loyalty_transactions ADD COLUMN admin_id INT DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'loyalty_transactions' AND COLUMN_NAME = 'admin_id'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+SET @update_sql = (
+    SELECT IF(COUNT(*) = 0, 'ALTER TABLE order_loyalty ADD COLUMN inventory_reward_id VARCHAR(40) DEFAULT NULL', 'SELECT 1')
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_loyalty' AND COLUMN_NAME = 'inventory_reward_id'
+);
+PREPARE update_stmt FROM @update_sql;
+EXECUTE update_stmt;
+DEALLOCATE PREPARE update_stmt;
+-- Keep every supported order status.
+ALTER TABLE orders
+    MODIFY status ENUM('Placed','Preparing','Ready','Served','Delivered','Completed','Cancelled')
+    NOT NULL DEFAULT 'Placed';
+
+-- Initialize review requirements without overwriting saved decisions.
+UPDATE orders SET payment_review = 'Not required'
+WHERE payment_method = 'Cash' AND payment_review = 'Pending';
+UPDATE orders SET id_review = 'Pending'
+WHERE discount > 0 AND id_review = 'Not required'
+  AND NOT EXISTS (SELECT 1 FROM loyalty_transactions l WHERE l.order_id = orders.order_id AND l.kind = 'Redeem');
+
+-- Fill in missing sample products without changing existing products.
 INSERT INTO products (name, category, description, price, image_url, is_available)
 SELECT 'Classic Espresso','Hot','Bold, strong, and purely Filipino — the essence of every true brew.',145,'assets/Coffee/espresso.jpg',1
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Classic Espresso' AND category = 'Hot');
@@ -290,5 +489,3 @@ WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Burnt Cheesecake' AND cat
 INSERT INTO products (name, category, description, price, image_url, is_available)
 SELECT 'Chocolate Pistachio Eclair','Snacks and Bites','A chocolate eclair filled with smooth cream and pistachio.',100,'assets/Pastries/Chocolatepistacioeclairs.webp',1
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Chocolate Pistachio Eclair' AND category = 'Snacks and Bites');
-
--- Create your first administrator by opening setup_admin.php.

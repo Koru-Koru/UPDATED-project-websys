@@ -1,4 +1,4 @@
-/* Theme controls are shared by the admin dashboard and customer profile. */
+/* Theme toggle */
 .theme-toggle {
     display: inline-flex;
     align-items: center;
@@ -85,8 +85,7 @@ html[data-coffee-theme="dark"] .alert-danger { background: #482822; border-color
 html[data-coffee-theme="dark"] .alert-info { background: #253640; border-color: #476373; color: #c9e6f5; }
 html[data-coffee-theme="dark"] .btn-close { filter: invert(1) grayscale(100%) brightness(150%); }
 
-
-/* Admin tables, forms, reports, account tools, and sign-in. */
+/* Forms and tables */
 html[data-coffee-theme="dark"] :is(.auth-page, .feature-page) { background: #191614; color: #f0e6db; }
 html[data-coffee-theme="dark"] :is(.card, .auth-card) {
     --bs-card-bg: #28211d;
@@ -134,8 +133,7 @@ html[data-coffee-theme="dark"] .feature-brand small { color: #c4ad97; }
 html[data-coffee-theme="dark"] .auth-card .theme-toggle { background: #3b2d23; color: #ecc69e; border-color: #9b7656; }
 html[data-coffee-theme="dark"] .feature-main .btn-danger { background: #482822; color: #ffd0c5; border-color: #a65c4e; }
 
-
-/* Keep every button state readable instead of inheriting the light palette. */
+/* Dark button states */
 html[data-coffee-theme="dark"] .btn-outline-primary {
     --bs-btn-color: #ecc69e; --bs-btn-border-color: #9b7656;
     --bs-btn-hover-bg: #ecc69e; --bs-btn-hover-border-color: #ecc69e; --bs-btn-hover-color: #201811;
@@ -178,7 +176,7 @@ html[data-coffee-theme="dark"] .feature-main input[type="checkbox"] { accent-col
 html[data-coffee-theme="dark"] .feature-main a:not(.btn):not(.feature-brand):not(.feature-home) { color: #ecc69e; }
 html[data-coffee-theme="dark"] .feature-main a:not(.btn):not(.feature-brand):not(.feature-home):hover { color: #ffdebc; }
 
-/* Keep the theme switch directly beside Log Out on every signed-in page. */
+/* Account navigation */
 .theme-session-actions { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: nowrap; flex-shrink: 0; }
 .theme-session-actions .theme-logout { border-radius: 2rem; padding: .5rem .9rem; line-height: 1.3; white-space: nowrap; }
 .feature-nav > .container { flex-wrap: wrap; }

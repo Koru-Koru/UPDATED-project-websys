@@ -215,7 +215,7 @@ try {
     $saved = $conn->query("SELECT total, id_review FROM orders WHERE order_id=$rewardId")->fetch_assoc();
     check($saved['total'] === '50.00' && $saved['id_review'] === 'Not required', 'Reward deducts fifty pesos without requiring a Senior or PWD ID');
     // Repeat-importing the update must not turn a loyalty discount into an ID discount.
-    $conn->multi_query(file_get_contents(__DIR__ . '/../database_update.sql'));
+    $conn->multi_query(file_get_contents(__DIR__ . '/../database.sql'));
     do { if ($result = $conn->store_result()) $result->free(); if (!$conn->more_results()) break; } while ($conn->next_result());
     check($conn->query("SELECT id_review FROM orders WHERE order_id=$rewardId")->fetch_assoc()['id_review'] === 'Not required', 'Repeat database updates preserve loyalty discount requirements');
     update_order_status($conn, $rewardId, 'Cancelled'); update_order_status($conn, $rewardId, 'Cancelled');

@@ -1,5 +1,4 @@
-
-/* ==================== VARIABLES ==================== */
+/* variables */
 :root {
     --coffee: #5b2c1b;
     --coffee-dark: #3c1d12;
@@ -9,7 +8,7 @@
     --border: #eadfd3;
 }
 
-/* ==================== GLOBAL ==================== */
+/* global */
 html {
     scroll-behavior: smooth;
     scroll-padding-top: 85px;
@@ -32,7 +31,7 @@ body.account-body {
     letter-spacing: .4px;
 }
 
-/* ==================== NAVBAR ==================== */
+/* navbar */
 .site-header {
     position: fixed;
     top: 0;
@@ -141,7 +140,6 @@ body.account-body {
     }
 }
 
-
 /* Back to Profile Link */
 .back-profile {
     display: inline-flex;
@@ -176,7 +174,6 @@ body.account-body {
 .back-profile:hover span {
     transform: translateX(-3px);
 }
-
 
 /* Smaller desktop screens */
 @media (min-width: 992px) and (max-width: 1199.98px) {
@@ -266,7 +263,7 @@ body.account-body {
     }
 }
 
-/* ==================== HERO SLIDESHOW ==================== */
+/* hero slideshow */
 .hero {
     position: relative;
     overflow: hidden;
@@ -339,7 +336,7 @@ body.account-body {
     line-height: 1.8;
 }
 
-/* ==================== BUTTONS ==================== */
+/* buttons */
 .btn-coffee {
     border: 1px solid var(--accent);
     background: var(--accent);
@@ -374,7 +371,6 @@ body.account-body {
     color: #fff;
 }
 
-/* Shared shape for every Bootstrap button */
 .btn {
     --bs-btn-border-radius: .55rem;
     --bs-btn-font-weight: 600;
@@ -385,7 +381,7 @@ body.account-body {
     box-shadow: 0 0 0 .2rem rgba(159, 45, 32, .22);
 }
 
-/* Coffee-toned versions of the stock Bootstrap button variants */
+/* Button variants */
 .btn-outline-primary {
     --bs-btn-color: var(--coffee);
     --bs-btn-border-color: var(--coffee);
@@ -448,7 +444,6 @@ body.account-body {
     --bs-btn-border-radius: 999px;
 }
 
-/* Close buttons get a soft coffee hover so they match the theme */
 .btn-close {
     border-radius: 50%;
     transition: background-color .2s ease, opacity .2s ease;
@@ -464,7 +459,7 @@ body.account-body {
     background-color: rgba(255, 255, 255, .2);
 }
 
-/* ==================== CONTENT SECTIONS ==================== */
+/* content sections */
 .section-space {
     padding: 5rem 1rem;
 }
@@ -479,7 +474,7 @@ body.account-body {
     line-height: 1.9;
 }
 
-/* ==================== MENU AND PRODUCTS ==================== */
+/* menu and products */
 .product-grid {
     --product-gap: 1.75rem;
     display: flex;
@@ -576,7 +571,7 @@ body.account-body {
     font-size: .75rem;
 }
 
-/* ==================== CART TRIGGER AND DRAWER ==================== */
+/* cart trigger and drawer */
 body.cart-scroll-lock {
     overflow: hidden;
 }
@@ -916,7 +911,7 @@ body.cart-scroll-lock {
     text-decoration: underline;
 }
 
-/* ==================== CART / CHECKOUT OVERLAYS ==================== */
+/* cart / checkout overlays */
 .cart-modal {
     position: fixed;
     z-index: 2000;
@@ -965,7 +960,7 @@ body.cart-scroll-lock {
     margin-bottom: 1.25rem;
 }
 
-/* ==================== CHECKOUT ==================== */
+/* checkout */
 .checkout-content {
     max-width: 880px;
 }
@@ -1383,7 +1378,7 @@ body.cart-scroll-lock {
     text-decoration: underline;
 }
 
-/* ==================== CONFIRMATION ==================== */
+/* confirmation */
 .confirmation-content {
     max-width: 640px;
 }
@@ -1419,7 +1414,7 @@ body.cart-scroll-lock {
     color: #3c6e52;
 }
 
-/* ==================== TOASTS ==================== */
+/* toasts */
 .toast-stack {
     position: fixed;
     z-index: 2100;
@@ -1731,7 +1726,7 @@ body.cart-scroll-lock {
 
 }
 
-/* ==================== FOOTER AND ANIMATION ==================== */
+/* footer and animation */
 .site-footer {
     background: var(--coffee-dark) !important;
 }
@@ -1752,7 +1747,7 @@ body.cart-scroll-lock {
     }
 }
 
-/* ==================== CUSTOMER ACCOUNT PAGES ==================== */
+/* customer account pages */
 .account-navbar {
     background: rgba(47, 28, 20, .96);
     backdrop-filter: blur(10px);
@@ -1852,7 +1847,7 @@ body.cart-scroll-lock {
     }
 }
 
-/* ==================== LOGIN AND ADMIN PAGES ==================== */
+/* login and admin pages */
 
 .auth-page {
     display: flex;
@@ -1909,7 +1904,7 @@ body.cart-scroll-lock {
     box-shadow: 0 0 0 .2rem rgba(159, 45, 32, .12) !important;
 }
 
-/* ==================== RESPONSIVE LAYOUT ==================== */
+/* responsive layout */
 @media (max-width: 991.98px) {
     .product-grid > .product-card {
         flex-basis: calc((100% - var(--product-gap)) / 2);
@@ -1982,7 +1977,7 @@ body.cart-scroll-lock {
     }
 }
 
-/* ==================== ACCESSIBILITY ==================== */
+/* accessibility */
 @media (prefers-reduced-motion: reduce) {
     html {
         scroll-behavior: auto;
@@ -1996,7 +1991,7 @@ body.cart-scroll-lock {
     }
 }
 
-/* Shared coffee theme for account tools and the admin additions. */
+/* Account tools */
 .feature-page { background: radial-gradient(ellipse at top right, #eee1d0 0, transparent 48%), var(--cream); min-height: 100vh; }
 .feature-nav { background: #fffdf9; border-bottom: 1px solid var(--border); }
 .feature-nav > .container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
@@ -2082,7 +2077,7 @@ body.cart-scroll-lock {
 #delivery-address-panel { padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: #faf3e9; }
 #delivery-address { resize: vertical; min-height: 95px; }
 
-/* Coffee rewards, shared by profile, checkout, and order details. */
+/* Rewards */
 .loyalty-card { padding: 1.2rem; border: 1px solid var(--border); border-radius: 1rem; background: #fbf3e6; }
 .loyalty-card h2 { font-family: Georgia, serif; color: var(--coffee); }
 .loyalty-card input { accent-color: var(--accent); flex-shrink: 0; }
@@ -2105,7 +2100,7 @@ body.cart-scroll-lock {
     .loyalty-reward-option:nth-child(3), .loyalty-reward-option.is-merchandise { grid-column: span 2; }
     .reward-product-image { width: 72px; height: 72px; }
 }
-/* Customer records: one balance badge and one clear group of actions. */
+/* Customer records */
 .customer-records-table { margin-bottom: 0; }
 .customer-records-table th { padding: .85rem .65rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #92725a; white-space: nowrap; }
 .customer-records-table td { padding: 1rem .65rem; }

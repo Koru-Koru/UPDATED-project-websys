@@ -23,8 +23,8 @@ $(function () {
     function updateLoyaltyBalance(balance) {
         loyaltyBalance = Number(balance) || 0;
         $('#loyalty-balance').text(loyaltyBalance);
-        const unavailable = loyaltyBalance < selectedReward().points || selectedReward().stock === 0;
         const selected = selectedReward();
+        const unavailable = loyaltyBalance < selected.points || selected.stock === 0;
         $('#reward-stock-note').text(selected.image ? (selected.stock === null ? 'Available' : selected.stock === 0 ? 'Sold out' : selected.stock + ' left available') : '');
         $('#redeem-loyalty').prop('disabled', unavailable);
         if (unavailable) $('#redeem-loyalty').prop('checked', false);
@@ -65,9 +65,7 @@ $(function () {
     const peso = value => '₱' + (Number(value) || 0).toFixed(2);
     const toCents = value => Math.round((Number(value) || 0) * 100);
 
-    /* ------------------------------------------------------------------
-       Cart storage
-    ------------------------------------------------------------------ */
+    // Cart storage
 
     function saveCart() {
         try {
@@ -151,9 +149,7 @@ $(function () {
         return Math.round(amount * 100);
     }
 
-    /* ------------------------------------------------------------------
-       Toasts
-    ------------------------------------------------------------------ */
+    // Toasts
 
     function showToast(message, options) {
         const settings = options || {};
@@ -197,9 +193,7 @@ $(function () {
         toast.show();
     }
 
-    /* ------------------------------------------------------------------
-       Slideshow, tabs, hero
-    ------------------------------------------------------------------ */
+    // Slideshow, tabs, hero
 
     const $slides = $('.slide');
 
@@ -227,9 +221,7 @@ $(function () {
         document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
     });
 
-    /* ------------------------------------------------------------------
-       Menu quantity steppers
-    ------------------------------------------------------------------ */
+    // Menu quantity steppers
 
     $('.quantity-minus').on('click', function () {
         const $input = $(this).siblings('.menu-quantity-input');
@@ -249,9 +241,7 @@ $(function () {
         $input.val(Number.isInteger(quantity) ? Math.min(max, Math.max(1, quantity)) : 1);
     });
 
-    /* ------------------------------------------------------------------
-       Cart badge
-    ------------------------------------------------------------------ */
+    // Cart badge
 
     function updateCount(pop) {
         const count = itemCount();
@@ -267,9 +257,7 @@ $(function () {
         }
     }
 
-    /* ------------------------------------------------------------------
-       Cart drawer
-    ------------------------------------------------------------------ */
+    // Cart drawer
 
     function anyOverlayOpen() {
         return $drawer.hasClass('show') || $checkout.hasClass('is-open') || $confirmation.hasClass('is-open');
@@ -457,9 +445,7 @@ $(function () {
         });
     });
 
-    /* ------------------------------------------------------------------
-       Add to cart
-    ------------------------------------------------------------------ */
+    // Add to cart
 
     $('.add-cart').on('click', function () {
         const $button = $(this);
@@ -545,9 +531,7 @@ $(function () {
         });
     });
 
-    /* ------------------------------------------------------------------
-       Checkout
-    ------------------------------------------------------------------ */
+    // Checkout
 
     function totalsNow() {
         const subCents = subtotalCents();
@@ -1083,9 +1067,7 @@ $(function () {
         window.print();
     });
 
-    /* ------------------------------------------------------------------
-       Overlay behaviours
-    ------------------------------------------------------------------ */
+    // Overlay behaviours
 
     $checkout.on('mousedown', function (event) {
         if (event.target === this) {

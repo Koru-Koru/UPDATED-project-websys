@@ -1,5 +1,5 @@
 <?php
-// Amount validation, image uploads, and checkout schema checks.
+
 function submitted_amount_to_cents($value): ?int
 {
     if (!is_int($value) && !is_float($value)) {

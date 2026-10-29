@@ -7,7 +7,6 @@ if (!empty($_SESSION['admin_id'])) {
     exit;
 }
 
-// New installations need an administrator before password login is possible.
 if ($conn->query('SELECT admin_id FROM admins LIMIT 1')->num_rows === 0) {
     header('Location: ../setup_admin.php');
     exit;

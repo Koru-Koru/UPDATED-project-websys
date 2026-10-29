@@ -20,7 +20,7 @@ function set_flash(string $message, string $type = 'success'): void {
     $_SESSION['flash'] = ['message' => $message, 'type' => $type];
 }
 
-// Schema changes are managed by database_update.sql, outside customer requests.
+// Schema changes are managed by database.sql, outside customer requests.
 function products_support_stock(mysqli $conn): bool {
     static $supported = null;
     if ($supported === null) {
