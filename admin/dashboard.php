@@ -47,7 +47,7 @@ $customerCount = (int) $conn
     <h1 class="h2 mb-4 text-center">Admin Dashboard</h1>
     <div class="dashboard-shortcuts d-flex flex-wrap justify-content-center gap-2 mb-4">
         <a href="settings.php" class="btn btn-outline-coffee">Password settings</a>
-        <a href="reward_stock.php" class="btn btn-outline-coffee">Mug &amp; flask stock</a>
+        <a href="reward_stock.php" class="btn btn-outline-coffee">Merchandise stock</a>
         <a href="recovery.php" class="btn btn-outline-coffee">Customer recovery requests</a>
         <a href="analytics.php" class="btn btn-outline-coffee">Reports and CSV export</a>
     </div>

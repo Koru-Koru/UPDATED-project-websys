@@ -4,12 +4,46 @@ require_once __DIR__ . '/../includes/functions.php';
 
 require_once __DIR__ . '/../includes/order_features.php';
 require_admin();
+require_once __DIR__ . '/../includes/checkout.php';
 
 $allowedStatuses = array_keys(order_status_transitions());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
     $orderId = filter_input(INPUT_POST, 'order_id', FILTER_VALIDATE_INT) ?: 0;
+    if (($_POST['action'] ?? '') === 'save_cash') {
+        try {
+            $raw = $_POST['cash_received'] ?? null;
+            $cashCents = is_string($raw) ? database_amount_to_cents(trim($raw)) : null;
+            if ($orderId < 1 || $cashCents === null || $cashCents < 1) {
+                throw new RuntimeException('Enter a valid cash amount with up to two decimal places.');
+            }
+            $conn->begin_transaction();
+            $stmt = $conn->prepare('SELECT payment_method, total, status FROM orders WHERE order_id = ? FOR UPDATE');
+            $stmt->bind_param('i', $orderId);
+            $stmt->execute();
+            $cashOrder = $stmt->get_result()->fetch_assoc();
+            if (!$cashOrder || $cashOrder['payment_method'] !== 'Cash' || $cashOrder['status'] === 'Cancelled') {
+                throw new RuntimeException('Cash can only be recorded for a non-cancelled cash order.');
+            }
+            $totalCents = database_amount_to_cents($cashOrder['total']);
+            if ($totalCents === null || $cashCents < $totalCents) {
+                throw new RuntimeException('Cash received must cover the order total.');
+            }
+            $cash = number_format($cashCents / 100, 2, '.', '');
+            $change = number_format(($cashCents - $totalCents) / 100, 2, '.', '');
+            $stmt = $conn->prepare('UPDATE orders SET cash_received = ?, change_amount = ? WHERE order_id = ?');
+            $stmt->bind_param('ssi', $cash, $change, $orderId);
+            $stmt->execute();
+            $conn->commit();
+            set_flash("Cash payment saved for order #$orderId. Change: ₱$change.");
+        } catch (Throwable $e) {
+            $conn->rollback();
+            set_flash($e instanceof mysqli_sql_exception ? 'Unable to save cash payment. Please try again.' : $e->getMessage(), 'danger');
+        }
+        header('Location: orders.php');
+        exit;
+    }
     $status = (string) ($_POST['status'] ?? '');
 
     if ($orderId < 1 || !in_array($status, $allowedStatuses, true)) {
@@ -146,7 +180,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                 <th>Date</th>
                                 <th>Total</th>
                                 <th>Status</th>
-                                <th>Proof of Payment</th>
+                                <th>Payment / Cash Received</th>
                                 <th>Update Status</th>
                                 <th>Details</th>
                             </tr>
@@ -226,7 +260,23 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                     <td>
                                         <?php if ($order['id_review'] !== 'Not required'): ?>
                                             <a class="d-block small mb-2" href="discount_proof.php?id=<?= (int) $order['order_id'] ?>" target="_blank" rel="noopener">Review Senior / PWD ID</a>
-                                        <?php endif; ?>                                        <?php if (!empty($order['payment_proof'])): ?>
+                                        <?php endif; ?>
+                                        <?php if (($order['payment_method'] ?? 'Cash') === 'Cash'): ?>
+                                            <span class="badge <?= (float)$order['cash_received'] >= (float)$order['total'] ? 'text-bg-success' : 'text-bg-warning' ?> mb-2">
+                                                <?= (float)$order['cash_received'] >= (float)$order['total'] ? 'Cash recorded' : 'Awaiting cash payment' ?>
+                                            </span>
+                                            <?php if ($order['status'] !== 'Cancelled'): ?>
+                                                <form method="post" class="d-flex flex-column gap-2" style="min-width:180px">
+                                                    <?= csrf_field() ?>
+                                                    <input type="hidden" name="action" value="save_cash">
+                                                    <input type="hidden" name="order_id" value="<?= (int)$order['order_id'] ?>">
+                                                    <label for="cash-<?= (int)$order['order_id'] ?>" class="small">Cash received (₱)</label>
+                                                    <input id="cash-<?= (int)$order['order_id'] ?>" type="number" name="cash_received" class="form-control form-control-sm" min="<?= h($order['total']) ?>" max="99999999.99" step="0.01" required value="<?= (float)$order['cash_received'] > 0 ? h($order['cash_received']) : '' ?>" placeholder="Enter amount paid">
+                                                    <button class="btn btn-outline-coffee btn-sm" type="submit">Save Cash Payment</button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <div class="small mt-2">Received: ₱<?= number_format((float)$order['cash_received'], 2) ?><br>Change: ₱<?= number_format((float)$order['change_amount'], 2) ?></div>
+                                        <?php elseif (!empty($order['payment_proof'])): ?>
                                             <a
                                                 href="../<?= h($order['payment_proof']) ?>"
                                                 target="_blank"

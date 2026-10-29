@@ -200,7 +200,9 @@ html[data-coffee-theme="dark"] .loyalty-progress { background: #493b32; }
 html[data-coffee-theme="dark"] .loyalty-progress .progress-bar { background: #d9a271; }
 html[data-coffee-theme="dark"] .loyalty-reward-option { background: #302721; }
 html[data-coffee-theme="dark"] .loyalty-reward-option.is-ready { background: #284132; border-color: #799667; }
-html[data-coffee-theme="dark"] .loyalty-reward-option span, html[data-coffee-theme="dark"] .loyalty-reward-option small { color: #c1b0a0; }
+html[data-coffee-theme="dark"] .loyalty-reward-option :is(strong, span, small) { color: #fff; }
+html[data-coffee-theme="dark"] .loyalty-reward-option .reward-availability { background: #284132; color: #fff; }
+html[data-coffee-theme="dark"] .loyalty-reward-option .reward-availability.is-sold-out { background: #612f29; color: #fff; }
 html[data-coffee-theme="dark"] .customer-points-badge { background: #49382b; color: #ecc69e; }
 html[data-coffee-theme="dark"] .customer-records-table th { color: #c1ab96; }
 html[data-coffee-theme="dark"] .stock-product .stock-category { color: #ecc69e; }

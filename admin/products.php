@@ -12,6 +12,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $id = (int) ($_POST['product_id'] ?? 0);
 
+    if ($action === 'bulk_stock') {
+        $selected = $_POST['product_ids'] ?? [];
+        $raw = $_POST['bulk_stock'] ?? '';
+        $valid = $stockSupported && is_array($selected) && is_string($raw);
+        $ids = [];
+        if ($valid) {
+            foreach ($selected as $value) {
+                $value = is_string($value) ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+                if ($value === false) {
+                    $valid = false;
+                    break;
+                }
+                $ids[] = $value;
+            }
+            $ids = array_values(array_unique($ids));
+        }
+        $stock = $valid && trim($raw) !== ''
+            ? filter_var(trim($raw), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 1000000]])
+            : null;
+        if (!$valid || !$ids || $stock === false) {
+            set_flash('Select products and enter stock from 0 to 1,000,000, or leave it blank for unlimited.', 'danger');
+        } else {
+            try {
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $conn->prepare("UPDATE products SET stock = ? WHERE product_id IN ($placeholders)");
+                $params = array_merge([$stock], $ids);
+                $stmt->bind_param(str_repeat('i', count($params)), ...$params);
+                $stmt->execute();
+                set_flash('Stock saved for the selected products.');
+            } catch (mysqli_sql_exception $e) {
+                set_flash('Unable to update stock. Please try again.', 'danger');
+            }
+        }
+        header('Location: products.php');
+        exit;
+    }
+
     if ($action === 'delete' && $id > 0) {
         try {
             $stmt = $conn->prepare('DELETE FROM products WHERE product_id = ?');
@@ -228,18 +265,36 @@ $formAction = $editProduct ? 'edit' : 'add';
                     <?= $editProduct ? 'Edit Product' : 'Add Product' ?>
                 </h2>
 
+                <div class="row g-2 align-items-end mb-4">
+                    <div class="col-md-8">
+                        <label for="existing-product" class="form-label">Browse existing products (<?= count($products) ?>)</label>
+                        <select id="existing-product" class="form-select" onchange="if (this.value) window.location.href = 'products.php?edit=' + encodeURIComponent(this.value);">
+                            <option value="">Select a product to view or edit</option>
+                            <?php foreach ($categories as $category): ?>
+                                <optgroup label="<?= h($category) ?>">
+                                    <?php foreach ($products as $product): ?>
+                                        <?php if ($product['category'] !== $category) continue; ?>
+                                        <option value="<?= (int)$product['product_id'] ?>" <?= (int)($editProduct['product_id'] ?? 0) === (int)$product['product_id'] ? 'selected' : '' ?>><?= h($product['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-auto"><a href="#product-records" class="btn btn-outline-coffee">View All Products</a></div>
+                </div>
+
                 <form method="post" class="row g-3">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="<?= h($formAction) ?>">
                     <input type="hidden" name="product_id" value="<?= (int) ($editProduct['product_id'] ?? 0) ?>">
 
-                    <div class="col-md-6">
+                    <div class="col-md-6 col-xl-4">
                         <label for="name" class="form-label">Product Name</label>
                         <input id="name" class="form-control" name="name" maxlength="120" required
                                value="<?= h($editProduct['name'] ?? '') ?>">
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-xl-3">
                         <label for="category" class="form-label">Category</label>
                         <select id="category" class="form-select" name="category" required>
                             <?php foreach ($categories as $category): ?>
@@ -251,29 +306,29 @@ $formAction = $editProduct ? 'edit' : 'add';
                         </select>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-xl-2">
                         <label for="price" class="form-label">Price (₱)</label>
                         <input id="price" class="form-control" type="number" name="price"
                                min="0" step="0.01" required
                                value="<?= h($editProduct['price'] ?? '') ?>">
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-xl-3">
                         <label for="stock" class="form-label">Stock (servings)</label>
                         <input id="stock" class="form-control" type="number" name="stock"
                                min="0" max="1000000" step="1" inputmode="numeric"
                                placeholder="Unlimited"
                                value="<?= isset($editProduct['stock']) && $editProduct['stock'] !== null ? (int) $editProduct['stock'] : '' ?>">
-                        <div class="form-text">How many servings customers can order. Leave blank for unlimited; 0 marks it sold out.</div>
+                        <div class="form-text">Blank = unlimited; 0 = sold out.</div>
                     </div>
 
-                    <div class="col-12">
+                    <div class="col-lg-6">
                         <label for="description" class="form-label">Description</label>
                         <textarea id="description" class="form-control" name="description"
                                   rows="3" required><?= h($editProduct['description'] ?? '') ?></textarea>
                     </div>
 
-                    <div class="col-12">
+                    <div class="col-lg-6">
                         <label for="image_url" class="form-label">Image URL or asset path</label>
                         <input id="image_url" class="form-control" type="text" name="image_url"
                                placeholder="assets/Coffee/americano.jpg or https://example.com/image.jpg"
@@ -306,12 +361,35 @@ $formAction = $editProduct ? 'edit' : 'add';
 
         <div class="card admin-card shadow-sm">
             <div class="card-body p-4">
-                <h2 class="h5 mb-3">Product Records</h2>
+                <h2 id="product-records" class="h5 mb-3" style="scroll-margin-top:100px">Product Records</h2>
+
+                <?php if ($stockSupported): ?>
+                    <form method="post" id="bulk-stock-form" class="row g-3 align-items-end mb-4">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="bulk_stock">
+                        <div class="col-md-5">
+                            <label for="bulk-stock" class="form-label">Set stock for selected products</label>
+                            <input id="bulk-stock" name="bulk_stock" class="form-control" type="number"
+                                   min="0" max="1000000" step="1" placeholder="Unlimited" aria-describedby="bulk-stock-help">
+                            <div id="bulk-stock-help" class="form-text">Replaces each selected product's stock. Blank = unlimited; 0 = sold out.</div>
+                        </div>
+                        <div class="col-md-auto">
+                            <button id="bulk-stock-submit" type="submit" class="btn btn-coffee" disabled>Update Selected Stock</button>
+                        </div>
+                        <div class="col-md-auto">
+                            <span id="selected-count" class="text-secondary" role="status">0 products selected</span>
+                        </div>
+                    </form>
+                <?php endif; ?>
 
                 <div class="table-responsive">
                     <table class="table table-striped table-hover align-middle">
                         <thead>
                             <tr>
+                                <?php if ($stockSupported): ?>
+                                    <th><input id="select-all-products" type="checkbox" class="form-check-input"
+                                               aria-label="Select all products" <?= !$products ? 'disabled' : '' ?>></th>
+                                <?php endif; ?>
                                 <th>ID</th>
                                 <th>Product</th>
                                 <th>Category</th>
@@ -324,6 +402,12 @@ $formAction = $editProduct ? 'edit' : 'add';
                         <tbody>
                             <?php foreach ($products as $index => $product): ?>
                                 <tr>
+                                    <?php if ($stockSupported): ?>
+                                        <td><input type="checkbox" class="form-check-input product-select"
+                                                   name="product_ids[]" form="bulk-stock-form"
+                                                   value="<?= (int) $product['product_id'] ?>"
+                                                   aria-label="<?= h('Select ' . $product['name']) ?>"></td>
+                                    <?php endif; ?>
                                     <td><?= $index + 1 ?></td>
                                     <td><?= h($product['name']) ?></td>
                                     <td><?= h($product['category']) ?></td>
@@ -364,7 +448,7 @@ $formAction = $editProduct ? 'edit' : 'add';
 
                             <?php if (!$products): ?>
                                 <tr>
-                                    <td colspan="7" class="text-center text-secondary">
+                                    <td colspan="<?= $stockSupported ? 8 : 7 ?>" class="text-center text-secondary">
                                         No products found. Add a product using the form above.
                                     </td>
                                 </tr>
@@ -376,6 +460,32 @@ $formAction = $editProduct ? 'edit' : 'add';
         </div>
     </main>
 
+    <script>
+        (() => {
+            const form = document.getElementById('bulk-stock-form');
+            if (!form) return;
+            const all = document.getElementById('select-all-products');
+            const boxes = [...document.querySelectorAll('.product-select')];
+            const sync = () => {
+                const count = boxes.filter(box => box.checked).length;
+                all.checked = boxes.length > 0 && count === boxes.length;
+                all.indeterminate = count > 0 && count < boxes.length;
+                document.getElementById('bulk-stock-submit').disabled = count === 0;
+                document.getElementById('selected-count').textContent = `${count} product${count === 1 ? '' : 's'} selected`;
+            };
+            all.addEventListener('change', () => {
+                boxes.forEach(box => { box.checked = all.checked; });
+                sync();
+            });
+            boxes.forEach(box => box.addEventListener('change', sync));
+            form.addEventListener('submit', event => {
+                const count = boxes.filter(box => box.checked).length;
+                const stock = document.getElementById('bulk-stock').value.trim() || 'unlimited';
+                if (!count || !confirm(`Set stock to ${stock} for ${count} selected product(s)?`)) event.preventDefault();
+            });
+            sync();
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

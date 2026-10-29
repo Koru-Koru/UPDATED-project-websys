@@ -78,14 +78,33 @@ if (
     !is_array($items) || count($items) < 1 || count($items) > 50 ||
     $submittedSubtotalCents === null ||
     $submittedTotalCents === null ||
-    $submittedDiscountCents === null ||
-    ($paymentMethod === 'Cash' && ($cashCents === null || $cashCents < 1))
+    $submittedDiscountCents === null
 ) {
     respond(['ok' => false, 'message' => 'Order details are invalid.'], 400);
 }
 
 $fulfillmentMethod = $data['fulfillment_method'] ?? 'Pickup';
 $deliveryAddress = $data['delivery_address'] ?? '';
+if ($fulfillmentMethod === 'Delivery') {
+    $parts = $data['delivery_address_parts'] ?? null;
+    if (!is_array($parts)) {
+        respond(['ok' => false, 'message' => 'Complete your street address, barangay, city / municipality, and province.'], 400);
+    }
+    $addressLines = [];
+    foreach (['street' => 150, 'barangay' => 80, 'city' => 80, 'province' => 80] as $field => $limit) {
+        $value = $parts[$field] ?? null;
+        if (!is_string($value) || trim($value) === '' || mb_strlen(trim($value), 'UTF-8') > $limit) {
+            respond(['ok' => false, 'message' => 'Enter a valid ' . ($field === 'city' ? 'city / municipality' : $field) . ' for delivery.'], 400);
+        }
+        $addressLines[] = trim($value);
+    }
+    $landmark = $parts['landmark'] ?? '';
+    if (!is_string($landmark) || mb_strlen(trim($landmark), 'UTF-8') > 80) {
+        respond(['ok' => false, 'message' => 'Enter a landmark of 80 characters or fewer.'], 400);
+    }
+    if (trim($landmark) !== '') $addressLines[] = trim($landmark);
+    $deliveryAddress = implode(', ', $addressLines);
+}
 if (!is_string($fulfillmentMethod) || !in_array($fulfillmentMethod, ['Pickup', 'Delivery'], true)) {
     respond(['ok' => false, 'message' => 'Choose Pickup or Delivery.'], 400);
 }
@@ -253,14 +272,9 @@ try {
     $realTotal = $realTotalCents / 100;
 
     if ($paymentMethod === 'Cash') {
-        if ($cashCents < $realTotalCents) {
-            throw new RuntimeException(
-                'Insufficient cash. Please enter an amount equal to or greater than the total.'
-            );
-        }
-
-        $cash = $cashCents / 100;
-        $change = ($cashCents - $realTotalCents) / 100;
+        // Cash is collected by the cashier after the customer places the order.
+        $cash = 0.0;
+        $change = 0.0;
     } else {
 
         $cash = $realTotal;

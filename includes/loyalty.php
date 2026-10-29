@@ -7,8 +7,8 @@ function loyalty_rewards(?mysqli $conn = null): array {
         '5' => ['points' => 5, 'cents' => 2000, 'label' => '₱20 off'],
         '10' => ['points' => 10, 'cents' => 5000, 'label' => '₱50 off'],
         '20' => ['points' => 20, 'cents' => 10000, 'label' => '₱100 off'],
-        '30' => ['points' => 30, 'cents' => 0, 'label' => 'Branded coffee mug', 'image' => 'assets/merchandise/coffee-mug-brand-logo.png'],
-        '50' => ['points' => 50, 'cents' => 0, 'label' => 'Branded coffee flask', 'image' => 'assets/merchandise/coffee-flask-brand-logo.png']
+        '30' => ['points' => 30, 'cents' => 0, 'label' => 'Phbestcoffee mug', 'image' => 'assets/merchandise/coffee-mug-brand-logo.png'],
+        '50' => ['points' => 50, 'cents' => 0, 'label' => 'Phbestcoffee flask', 'image' => 'assets/merchandise/coffee-flask-brand-logo.png']
     ];
     if ($conn !== null) {
         foreach ($conn->query('SELECT reward_id, stock FROM reward_inventory') as $item) {

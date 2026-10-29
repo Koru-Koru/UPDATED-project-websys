@@ -298,7 +298,7 @@ try {
     $audit = $conn->query("SELECT admin_id, order_id FROM loyalty_transactions WHERE customer_id=$customerId AND kind='Adjust' ORDER BY transaction_id DESC LIMIT 1")->fetch_assoc();
     check((int)$audit['admin_id'] === $adminId && $audit['order_id'] === null, 'Point adjustments record the admin and do not require an order');
     $stockPage = request('/admin/reward_stock.php', null, 'admin');
-    check(str_contains($stockPage['body'], 'Branded coffee mug') && str_contains($stockPage['body'], 'Branded coffee flask'), 'Admin stock page shows both merchandise rewards');
+    check(str_contains($stockPage['body'], 'Phbestcoffee mug') && str_contains($stockPage['body'], 'Phbestcoffee flask'), 'Admin stock page shows both merchandise rewards');
     $response = request('/admin/reward_stock.php', ['csrf_token' => token($stockPage), 'reward_id' => '30', 'stock' => '-1'], 'admin');
     check(str_contains($response['body'], 'whole stock quantity'), 'Admin cannot set negative merchandise stock');
     check(request('/admin/reward_stock.php', ['csrf_token' => 'wrong', 'reward_id' => '30', 'stock' => '0'], 'admin')['status'] === 403, 'Merchandise stock changes require valid CSRF');

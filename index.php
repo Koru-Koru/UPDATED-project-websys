@@ -4,6 +4,14 @@ require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/loyalty.php';
 $loyaltyBalance = empty($_SESSION['customer_id']) ? 0 : loyalty_balance($conn, (int)$_SESSION['customer_id']);
 $stockSupported = products_support_stock($conn);
+$ongoingOrderCount = 0;
+if (!empty($_SESSION['customer_id'])) {
+    $customerId = (int) $_SESSION['customer_id'];
+    $ongoingStmt = $conn->prepare("SELECT COUNT(*) FROM orders WHERE customer_id = ? AND status NOT IN ('Served', 'Delivered', 'Completed', 'Cancelled')");
+    $ongoingStmt->bind_param('i', $customerId);
+    $ongoingStmt->execute();
+    $ongoingOrderCount = (int) $ongoingStmt->get_result()->fetch_row()[0];
+}
 $result = $conn->query('SELECT product_id, name, category, description, price, image_url, is_available' . ($stockSupported ? ', stock' : '') . ' FROM products ORDER BY FIELD(category, "Hot", "Iced", "Snacks and Bites"), name');
 $products = $result->fetch_all(MYSQLI_ASSOC);
 $grouped = ['Hot' => [], 'Iced' => [], 'Snacks and Bites' => []];
@@ -22,7 +30,7 @@ function render_products(array $items): void {
         if (!empty($product['image_url'])) {
             echo '<img src="' . h($product['image_url']) . '" class="card-img-top product-image" alt="' . h($product['name']) . '">';
         }
-        echo '<div class="card-body d-flex flex-column">';
+        echo '<div class="card-body d-flex flex-column text-start">';
         echo '<div class="d-flex align-items-start justify-content-between gap-2 mb-2">';
         echo '<h4 class="title-font h5 fw-semibold mb-0">' . h($product['name']) . '</h4>';
         if ($stock !== null) {
@@ -32,11 +40,12 @@ function render_products(array $items): void {
         }
         echo '</div>';
         echo '<p class="text-secondary small product-description mb-3">' . h($product['description']) . '</p>';
-        echo '<p class="menu-price">₱' . number_format((float)$product['price'], 2) . '</p>';
-        echo '<div class="menu-quantity d-flex align-items-center justify-content-center gap-2 mb-3 mt-auto">';
+        echo '<div class="menu-purchase-row mt-auto mb-3">';
+        echo '<p class="menu-price mb-0">₱' . number_format((float)$product['price'], 2) . '</p>';
+        echo '<div class="menu-quantity d-flex align-items-center gap-2">';
         echo '<button type="button" class="btn btn-outline-secondary quantity-minus" aria-label="Decrease ' . h($product['name']) . ' quantity"' . (!$available ? ' disabled' : '') . '>−</button>';
         echo '<input class="form-control text-center menu-quantity-input" type="number" min="1" max="' . $maxQty . '" step="1" value="1" aria-label="Quantity for ' . h($product['name']) . '" style="max-width:70px"' . (!$available ? ' disabled' : '') . '>';
-        echo '<button type="button" class="btn btn-outline-secondary quantity-plus" aria-label="Increase ' . h($product['name']) . ' quantity"' . (!$available ? ' disabled' : '') . '>+</button></div>';
+        echo '<button type="button" class="btn btn-outline-secondary quantity-plus" aria-label="Increase ' . h($product['name']) . ' quantity"' . (!$available ? ' disabled' : '') . '>+</button></div></div>';
         echo '<button class="add-cart btn btn-coffee w-100" data-id="' . (int)$product['product_id'] . '" data-name="' . h($product['name']) . '" data-price="' . h($product['price']) . '" data-image="' . h($product['image_url'] ?? '') . '" data-available="' . ($available ? 'true' : 'false') . '" data-stock="' . ($stock === null ? '' : (int) $stock) . '"' . (!$available ? ' disabled' : '') . '>' . h($buttonLabel) . '</button>';
         echo '</div></div>';
     }
@@ -71,25 +80,34 @@ function render_products(array $items): void {
         <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
           <li class="nav-item"><a href="#home" class="nav-link text-white text-uppercase small fw-medium">Home</a></li>
           <li class="nav-item"><a href="#menu" class="nav-link text-white text-uppercase small fw-medium">Menu</a></li>
-          <li class="nav-item"><a href="#contact" class="nav-link text-white text-uppercase small fw-medium">Contact</a></li>
           <li class="nav-item"><a href="#about" class="nav-link text-white text-uppercase small fw-medium">About</a></li>
-          <li class="nav-item"><a href="admin/login.php" class="nav-link text-white text-uppercase small fw-medium">Admin Login</a></li>
+          <li class="nav-item"><a href="#contact" class="nav-link text-white text-uppercase small fw-medium">Contact</a></li>
         </ul>
 
         <div class="ms-lg-3 mt-3 mt-lg-0 d-flex align-items-center gap-3">
+
           <?php if (!empty($_SESSION['customer_id'])): ?>
-            <a class="text-white small text-decoration-none" href="customer/profile.php">My Account</a>
-            <a class="text-white small text-decoration-none" href="customer/logout.php">Log out</a>
+            <a class="cart-trigger text-decoration-none" href="customer/profile.php" title="My Account" aria-label="My Account">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 10a9 9 0 0 0-9 8h2a7 7 0 0 1 14 0h2a9 9 0 0 0-9-8Z"/>
+              </svg>
+            </a>
           <?php else: ?>
-            <a class="text-white small text-decoration-none" href="customer/login.php">Sign in</a>
-            <a class="text-white small text-decoration-none" href="customer/register.php">Create account</a>
+            <div class="dropdown">
+              <button id="account-menu-btn" class="cart-trigger" type="button"
+                      data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account options" title="Account options">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 10a9 9 0 0 0-9 8h2a7 7 0 0 1 14 0h2a9 9 0 0 0-9-8Z"/>
+                </svg>
+              </button>
+              <ul class="dropdown-menu shadow" aria-labelledby="account-menu-btn">
+                <li><a class="dropdown-item" href="customer/login.php">Sign in</a></li>
+                <li><a class="dropdown-item" href="customer/register.php">Create account</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-secondary" href="admin/login.php">Admin login</a></li>
+              </ul>
+            </div>
           <?php endif; ?>
-          <button id="cart-open-btn" class="cart-trigger" type="button" title="View Cart" aria-label="Open cart" aria-controls="cart-modal" aria-expanded="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M7 7V6a5 5 0 0 1 10 0v1h2.2a1 1 0 0 1 1 1.1l-1.1 11.4a2 2 0 0 1-2 1.8H6.9a2 2 0 0 1-2-1.8L3.8 8.1A1 1 0 0 1 4.8 7H7Zm2 0h6V6a3 3 0 0 0-6 0v1Zm-1.2 4.2a1 1 0 1 0 2 0V9.6a1 1 0 0 0-2 0v1.6Zm6.4 0a1 1 0 1 0 2 0V9.6a1 1 0 0 0-2 0v1.6Z"/>
-            </svg>
-            <span id="cart-count" class="cart-badge is-empty" aria-hidden="true">0</span>
-          </button>
         </div>
       </div>
     </nav>
@@ -111,7 +129,7 @@ function render_products(array $items): void {
       </div>
     </section>
 
-    <section id="about" class="section-space bg-light text-center fade-in">
+    <section id="about" class="section-space contact-section text-center fade-in">
       <h3 class="title-font section-title fw-bold mb-4">Our Mission</h3>
       <p class="container about-copy text-secondary fs-5">To bring the finest Filipino-sourced coffee beans from mountain to cup — supporting our local farmers, promoting sustainability, and sharing the warmth of Filipino culture one brew at a time.</p>
     </section>
@@ -120,24 +138,50 @@ function render_products(array $items): void {
       <h3 class="title-font section-title fw-bold mb-5">Our Menu</h3>
 
       <div class="d-flex justify-content-center flex-wrap gap-2 mb-4 menu-tabs">
-        <button class="tab-btn btn btn-outline-coffee active" data-tab="hot">Hot</button>
+        <button class="tab-btn btn btn-outline-coffee active" data-tab="all-items">All Items</button>
+        <button class="tab-btn btn btn-outline-coffee" data-tab="hot">Hot</button>
         <button class="tab-btn btn btn-outline-coffee" data-tab="iced">Iced</button>
         <button class="tab-btn btn btn-outline-coffee" data-tab="snacks">Snacks and Bites</button>
       </div>
 
-      <div class="tab-content container product-grid" id="hot"><?php render_products($grouped['Hot']); ?></div>
+      <div class="tab-content container" id="all-items">
+        <?php foreach ($grouped as $category => $items): ?>
+          <section class="menu-category-section" aria-label="<?= h($category) ?>">
+            <h4 class="menu-category-heading title-font"><?= h($category) ?></h4>
+            <div class="product-grid"><?php render_products($items); ?></div>
+          </section>
+        <?php endforeach; ?>
+      </div>
+      <div class="tab-content container product-grid d-none" id="hot"><?php render_products($grouped['Hot']); ?></div>
       <div class="tab-content container product-grid d-none" id="iced"><?php render_products($grouped['Iced']); ?></div>
       <div class="tab-content container product-grid d-none" id="snacks"><?php render_products($grouped['Snacks and Bites']); ?></div>
+      <div class="text-center mt-5 pt-3">
+        <a href="#menu" class="btn btn-outline-coffee">↑ Back to Top of Menu</a>
+      </div>
     </section>
-    <section id="contact" class="section-space bg-light text-center fade-in">
-      <h3 class="title-font section-title fw-bold mb-4">Contact Us</h3>
-       <p>  (+63) 998-9446-923</p><br>
-       <p>  phbest@gmail.com</p><br>
-       <p>  Philippines' Best Coffee</p>
+    <section id="contact" class="section-space contact-section text-center fade-in" aria-labelledby="contact-title">
+      <div class="container">
+        <h3 id="contact-title" class="title-font section-title fw-bold mb-3">Contact Us</h3>
+        <p class="mb-4">Get in touch with Philippines' Best Coffee.</p>
+        <div class="row g-3 justify-content-center">
+          <div class="col-md-5 col-lg-4">
+            <a class="contact-link" href="tel:+639989446923">
+              <span class="contact-label">Call us</span>
+              <span>(+63) 998-9446-923</span>
+            </a>
+          </div>
+          <div class="col-md-5 col-lg-4">
+            <a class="contact-link" href="mailto:phbestcoffee@gmail.com">
+              <span class="contact-label">Email us</span>
+              <span>phbestcoffee@gmail.com</span>
+            </a>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
   <footer class="site-footer bg-dark text-light py-4 text-center fade-in">
-    <p class="small mb-2">&copy; 2025 Philippines' Coffee. All rights reserved.</p><div class="d-flex justify-content-center flex-wrap gap-3 small"><a class="text-light text-decoration-none" href="customer/login.php">Customer Login</a><a class="text-light text-decoration-none" href="customer/register.php">Create Customer Account</a><a class="text-light text-decoration-none" href="admin/login.php">Admin Login</a></div>
+    <p class="small mb-2">&copy; 2026 Philippines' Best Coffee. All rights reserved.</p><div class="d-flex justify-content-center flex-wrap gap-3 small"><a class="text-light text-decoration-none" href="customer/login.php">Customer Login</a><a class="text-light text-decoration-none" href="customer/register.php">Create Customer Account</a><a class="text-light text-decoration-none" href="admin/login.php">Admin Login</a></div>
   </footer>
   <div id="cart-backdrop" class="cart-backdrop" aria-hidden="true"></div>
 
@@ -157,6 +201,12 @@ function render_products(array $items): void {
     <div id="cart-items" class="cart-drawer-body" aria-live="polite"></div>
 
     <footer class="cart-drawer-footer">
+      <?php if (!empty($_SESSION['customer_id'])): ?>
+        <a href="customer/orders.php?ongoing=1" class="btn btn-outline-coffee w-100 mb-3">
+          <span id="ongoing-order-indicator" class="d-block fw-semibold" data-count="<?= $ongoingOrderCount ?>">You have <?= $ongoingOrderCount ?> ongoing order<?= $ongoingOrderCount === 1 ? '' : 's' ?></span>
+          <span class="d-block small mt-1">View Ongoing Orders →</span>
+        </a>
+      <?php endif; ?>
       <div id="cart-summary" class="d-none">
         <div class="summary-row">
           <span>Subtotal</span>
@@ -177,6 +227,7 @@ function render_products(array $items): void {
   </aside>
   <div id="checkout-modal" class="cart-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title" aria-hidden="true">
     <div class="cart-content checkout-content">
+      <img class="checkout-brand-watermark" src="Bestcoffee.jpg" alt="" aria-hidden="true">
       <header class="overlay-header">
         <div>
           <p class="cart-eyebrow mb-1">Step 2 of 3 · Payment</p>
@@ -210,19 +261,25 @@ function render_products(array $items): void {
           <h4 class="checkout-section-title">Payment</h4>
 
           <section id="loyalty-program" class="loyalty-card mb-3" data-balance="<?= $loyaltyBalance ?>" data-rewards="<?= h(json_encode(loyalty_rewards($conn))) ?>" data-cup-ids="<?= h(json_encode(array_map('intval', array_column(array_filter($products, fn($p) => in_array($p['category'], ['Hot', 'Iced'], true) && (float)$p['price'] > 0), 'product_id')))) ?>">
-            <span class="feature-eyebrow">COFFEE REWARDS</span>
-            <p class="mb-1">Available points: <strong id="loyalty-balance"><?= $loyaltyBalance ?></strong></p>
+            <details id="checkout-rewards">
+            <summary class="rewards-summary">
+              <span><span class="feature-eyebrow mb-1">COFFEE REWARDS</span><span>Available points: <strong id="loyalty-balance"><?= $loyaltyBalance ?></strong></span></span>
+            </summary>
+            <div class="mt-3">
             <p id="loyalty-estimate" class="small text-secondary mb-2">Earn 1 point per Hot or Iced drink after fulfillment.</p>
             <label for="loyalty-reward" class="form-label">Choose your reward</label>
             <select id="loyalty-reward" class="form-select mb-2">
+              <option value="" selected disabled>Choose an available reward</option>
               <?php foreach (loyalty_rewards($conn) as $rewardId => $reward): ?>
-                <option value="<?= $rewardId ?>" <?= (int)$rewardId === LOYALTY_REWARD_POINTS ? 'selected' : '' ?>><?= $reward['points'] ?> points · <?= h($reward['label']) ?></option>
+                <option value="<?= $rewardId ?>" <?= $loyaltyBalance < $reward['points'] || ($reward['stock'] ?? null) === 0 ? 'disabled' : '' ?>><?= $reward['points'] ?> points · <?= h($reward['label']) ?></option>
               <?php endforeach; ?>
             </select>
             <p id="reward-stock-note" class="small fw-semibold" aria-live="polite"></p>
             <div id="reward-merchandise-preview" class="merchandise-reward mb-3 d-none"><img alt="Selected merchandise reward"><span></span></div>
             <label class="d-flex align-items-center gap-2"><input type="checkbox" id="redeem-loyalty" <?= $loyaltyBalance < LOYALTY_REWARD_POINTS ? 'disabled' : '' ?>> <span>Apply selected reward</span></label>
             <p class="small text-secondary mt-2 mb-0">One reward per order. Cash rewards need a total above the discount amount. Mug and flask rewards are included with your order. Choose a reward or the Senior / PWD discount.</p>
+            </div>
+            </details>
           </section>
           <div class="form-check form-switch discount-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="senior-pwd">
@@ -247,19 +304,34 @@ function render_products(array $items): void {
             </div>
           </fieldset>
           <div id="delivery-address-panel" class="mb-3 d-none">
-            <label for="delivery-address" class="form-label fw-semibold">Delivery address</label>
-            <textarea id="delivery-address" class="form-control" rows="3" maxlength="500" autocomplete="shipping street-address" placeholder="House / unit number, street, barangay, city" aria-describedby="delivery-address-help"></textarea>
+            <p class="form-label fw-semibold">Delivery address</p>
+            <div class="row g-2">
+              <div class="col-12"><label for="delivery-address" class="form-label small">House / unit and street *</label><input id="delivery-address" class="form-control delivery-required" maxlength="150" autocomplete="shipping address-line1"></div>
+              <div class="col-12"><label for="delivery-barangay" class="form-label small">Barangay *</label><input id="delivery-barangay" class="form-control delivery-required" maxlength="80" autocomplete="shipping address-line2"></div>
+              <div class="col-12"><label for="delivery-city" class="form-label small">City / Municipality *</label><input id="delivery-city" class="form-control delivery-required" maxlength="80" autocomplete="shipping address-level2"></div>
+              <div class="col-12"><label for="delivery-province" class="form-label small">Province / Metro Manila *</label><input id="delivery-province" class="form-control delivery-required" maxlength="80" autocomplete="shipping address-level1"></div>
+              <div class="col-12"><label for="delivery-landmark" class="form-label small">Nearby landmark (optional)</label><input id="delivery-landmark" class="form-control" maxlength="80"></div>
+            </div>
             <p id="delivery-address-help" class="small text-secondary mt-2">Include your complete address and a nearby landmark so the rider can find you.</p>
           </div>
           <div id="pickup-time-panel" class="mt-3 mb-3">
-            <label for="pickup-at" class="form-label fw-semibold">Pickup time (optional)</label>
+            <fieldset class="mb-3">
+              <legend class="form-label fw-semibold">Pickup time</legend>
+              <div class="d-flex gap-2">
+                <label class="fulfillment-choice"><input type="radio" name="pickup-timing" value="now" checked> <span>Pickup now</span></label>
+                <label class="fulfillment-choice"><input type="radio" name="pickup-timing" value="later"> <span>Pickup later</span></label>
+              </div>
+            </fieldset>
+            <div id="pickup-schedule" class="d-none">
+            <label for="pickup-at" class="form-label">Choose pickup date and time</label>
             <input type="datetime-local" id="pickup-at" class="form-control" aria-describedby="pickup-help">
-            <p id="pickup-help" class="small text-secondary mt-2">Leave blank for pickup as soon as ready. Schedule at least 15 minutes ahead, up to 7 days ahead. Times are in Philippine time.</p>
+            <p id="pickup-help" class="small text-secondary mt-2">Schedule at least 15 minutes ahead, up to 7 days ahead. Times are in Philippine time.</p>
+            </div>
           </div>
           <p class="payment-label">Payment method</p>
           <div class="payment-methods" role="radiogroup" aria-label="Payment method">
-            <label class="payment-method is-active">
-              <input type="radio" name="payment-method" value="Cash" checked>
+            <label class="payment-method">
+              <input type="radio" name="payment-method" value="Cash">
               <span class="payment-method-icon payment-method-cash" aria-hidden="true">₱</span>
               <span class="payment-method-text">
                 <span class="payment-method-name">Cash</span>
@@ -295,26 +367,13 @@ function render_products(array $items): void {
             </label>
           </div>
 
-          <div id="cash-panel">
-            <label for="cash-amount" class="form-label fw-semibold">Cash received</label>
-            <div class="input-group cash-input-group">
-              <span class="input-group-text">₱</span>
-              <input type="number" id="cash-amount" class="form-control" placeholder="0.00" min="0.01" step="0.01"
-                     inputmode="decimal" autocomplete="off" aria-describedby="cash-feedback">
+          <div id="cash-panel" class="d-none mt-3">
+            <div class="cash-feedback is-hint" role="note">
+              <strong class="d-block mb-1">Please proceed to the counter to pay.</strong>
+              Place your order, then show your order number to the cashier and pay in cash.
+              <span class="d-block mt-2 small">Your order number will appear after you place the order.</span>
             </div>
-
-            <div class="cash-quick" role="group" aria-label="Quick cash amounts">
-              <button type="button" class="btn btn-outline-coffee btn-sm" data-cash="exact">Exact</button>
-              <button type="button" class="btn btn-outline-coffee btn-sm" data-cash="50">₱50</button>
-              <button type="button" class="btn btn-outline-coffee btn-sm" data-cash="100">₱100</button>
-              <button type="button" class="btn btn-outline-coffee btn-sm" data-cash="200">₱200</button>
-              <button type="button" class="btn btn-outline-coffee btn-sm" data-cash="500">₱500</button>
-              <button type="button" class="btn btn-outline-coffee btn-sm" data-cash="1000">₱1,000</button>
-            </div>
-
-            <div id="cash-feedback" class="cash-feedback is-hint">Enter the cash handed over to compute change.</div>
           </div>
-
           <div id="qr-panel" class="qr-panel d-none">
             <div class="qr-frame">
               <img id="qr-image" src="assets/payments/gcash-qr.jpg" alt="GCash payment QR code">
@@ -373,6 +432,11 @@ function render_products(array $items): void {
         </div>
       </div>
 
+      <div id="cash-order-number-panel" class="loyalty-card text-center mb-3 d-none">
+        <span class="feature-eyebrow">YOUR ORDER NUMBER</span>
+        <strong id="cash-order-number" class="d-block display-5 fw-bold"></strong>
+        <p class="mt-2 mb-0">Please show this number at the counter and pay in cash.</p>
+      </div>
       <div id="confirmation-body" class="mb-4"></div>
 
       <div class="d-flex justify-content-end gap-2 flex-wrap">
@@ -382,6 +446,13 @@ function render_products(array $items): void {
     </div>
   </div>
 
+  <button id="floating-cart-btn" class="btn btn-coffee floating-cart-btn" type="button"
+          aria-label="Open cart and checkout" aria-controls="cart-modal" aria-expanded="false" title="Cart and checkout">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d="M7 7V6a5 5 0 0 1 10 0v1h2.2a1 1 0 0 1 1 1.1l-1.1 11.4a2 2 0 0 1-2 1.8H6.9a2 2 0 0 1-2-1.8L3.8 8.1A1 1 0 0 1 4.8 7H7Zm2 0h6V6a3 3 0 0 0-6 0v1Z"/>
+    </svg>
+    <span>Checkout</span><span id="cart-count" class="cart-badge is-empty" aria-hidden="true">0</span>
+  </button>
   <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

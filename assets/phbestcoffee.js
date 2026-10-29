@@ -17,13 +17,32 @@ $(function () {
     let loyaltyBalance = Number($loyalty.data('balance')) || 0;
 
     function selectedReward() {
-        return rewards[$('#loyalty-reward').val()] || rewards['10'];
+        return rewards[$('#loyalty-reward').val()] || { points: Infinity, cents: 0, stock: null, label: '' };
     }
 
     function updateLoyaltyBalance(balance) {
         loyaltyBalance = Number(balance) || 0;
         $('#loyalty-balance').text(loyaltyBalance);
+        const $select = $('#loyalty-reward');
+        let firstAvailable = null;
+        $select.find('option').each(function () {
+            const reward = rewards[this.value];
+            if (!reward) return;
+            const eligible = loyaltyBalance >= reward.points && reward.stock !== 0;
+            this.disabled = !eligible;
+            if (eligible && firstAvailable === null) firstAvailable = this.value;
+        });
+        const current = rewards[$select.val()];
+        if (!current || loyaltyBalance < current.points || current.stock === 0) {
+            $select.val(firstAvailable || '');
+            $('#redeem-loyalty').prop('checked', false);
+        }
+        $select.prop('disabled', firstAvailable === null);
+        $select.find('option[value=""]').text(firstAvailable === null ? 'No rewards available for your points' : 'Choose an available reward');
         const selected = selectedReward();
+        $('#reward-merchandise-preview').toggleClass('d-none', !selected.image);
+        if (selected.image) $('#reward-merchandise-preview img').attr('src', selected.image).attr('alt', selected.label);
+        $('#reward-merchandise-preview span').text(selected.label);
         const unavailable = loyaltyBalance < selected.points || selected.stock === 0;
         $('#reward-stock-note').text(selected.image ? (selected.stock === null ? 'Available' : selected.stock === 0 ? 'Sold out' : selected.stock + ' left available') : '');
         $('#redeem-loyalty').prop('disabled', unavailable);
@@ -55,7 +74,7 @@ $(function () {
         }
     };
 
-    let paymentMethod = 'Cash';
+    let paymentMethod = '';
 
     let cart = [];
     let slideIndex = 0;
@@ -154,7 +173,7 @@ $(function () {
     function showToast(message, options) {
         const settings = options || {};
         const $toast = $('<div class="toast toast-coffee" role="status" aria-live="polite" aria-atomic="true"></div>');
-        const $body = $('<div class="d-flex align-items-center gap-2"></div>').appendTo($toast);
+        const $body = $('<div class="toast-body d-flex align-items-center gap-2"></div>').appendTo($toast);
 
         if (settings.tone === 'warning') $toast.addClass('is-warning');
 
@@ -176,7 +195,7 @@ $(function () {
                 .appendTo($body);
         }
 
-        $('<button type="button" class="btn-close btn-close-white ms-1" data-bs-dismiss="toast" aria-label="Close"></button>')
+        $('<button type="button" class="btn-close ms-1 flex-shrink-0" data-bs-dismiss="toast" aria-label="Close notification"></button>')
             .appendTo($body);
 
         $('#toast-stack').append($toast);
@@ -273,7 +292,7 @@ $(function () {
 
         $('#cart-backdrop').addClass('show');
         $drawer.addClass('show').attr('aria-hidden', 'false');
-        $('#cart-open-btn').attr('aria-expanded', 'true');
+        $('#cart-open-btn, #floating-cart-btn').attr('aria-expanded', 'true');
         syncScrollLock();
 
         window.setTimeout(function () {
@@ -286,7 +305,7 @@ $(function () {
 
         $('#cart-backdrop').removeClass('show');
         $drawer.removeClass('show').attr('aria-hidden', 'true');
-        $('#cart-open-btn').attr('aria-expanded', 'false');
+        $('#cart-open-btn, #floating-cart-btn').attr('aria-expanded', 'false');
         syncScrollLock();
 
         if (settings.restoreFocus !== false && lastFocused && typeof lastFocused.focus === 'function') {
@@ -415,7 +434,7 @@ $(function () {
         updateCount();
     });
 
-    $('#cart-open-btn').on('click', openCart);
+    $('#cart-open-btn, #floating-cart-btn').on('click', openCart);
     $('#close-cart-btn, #continue-shopping-btn').on('click', function () {
         closeCart();
     });
@@ -525,9 +544,7 @@ $(function () {
         if ($drawer.hasClass('show')) renderCart();
 
         showToast(quantity + ' × ' + name + ' added to cart', {
-            icon: '🛒',
-            actionLabel: 'View cart',
-            onAction: openCart
+            icon: '🛒'
         });
     });
 
@@ -565,7 +582,7 @@ $(function () {
     }
 
     function confirmLabel() {
-        return paymentMethod === 'Cash' ? 'Confirm payment' : 'Place order';
+        return paymentMethod === 'Cash' ? 'Place order · Pay at counter' : 'Place order';
     }
 
     function refreshCheckoutTotals() {
@@ -587,31 +604,11 @@ $(function () {
     }
 
     function updateCashFeedback() {
-        const totalCents = toCents(totalsNow().total);
-        const raw = String($('#cash-amount').val() || '').trim();
-        const cashCents = inputAmountCents(raw);
-        const $feedback = $('#cash-feedback').removeClass('is-ok is-short is-hint');
-
-        if (raw === '') {
-            $feedback.addClass('is-hint').text('Enter the cash handed over to compute change.');
-        } else if (cashCents === null) {
-            $feedback.addClass('is-short').text('Enter a valid amount with up to two decimal places.');
-        } else if (cashCents < totalCents) {
-            $feedback.addClass('is-short').text('Short by ' + peso((totalCents - cashCents) / 100) + '.');
-        } else {
-            $feedback.addClass('is-ok').text('Change due: ' + peso((cashCents - totalCents) / 100));
-        }
-
         updateConfirmState();
     }
 
-    function cashIsEnough() {
-        const cashCents = inputAmountCents($('#cash-amount').val());
-        return cashCents !== null && cashCents >= toCents(totalsNow().total);
-    }
-
     function paymentIsReady() {
-        return paymentMethod === 'Cash' ? cashIsEnough() : $('#qr-confirm').is(':checked');
+        return !!paymentMethod && (paymentMethod === 'Cash' || $('#qr-confirm').is(':checked'));
     }
 
     function updateConfirmState() {
@@ -621,16 +618,22 @@ $(function () {
     }
 
     function selectPaymentMethod(method) {
-        if (!paymentMethods[method]) return;
+        if (method !== '' && !paymentMethods[method]) return;
 
         paymentMethod = method;
         const config = paymentMethods[method];
+        $('input[name="payment-method"]').prop('checked', false).filter(function () { return this.value === method; }).prop('checked', true);
+        $('#qr-confirm').prop('checked', false);
 
         $('.payment-method').removeClass('is-active').filter(function () {
             return $(this).find('input[name="payment-method"]').val() === method;
         }).addClass('is-active');
 
-        if (method === 'Cash') {
+        if (!method) {
+            $('#cash-panel, #qr-panel, #qr-note, #qr-confirm-row, #proof-upload').addClass('d-none');
+            $('#cash-amount').val('');
+            resetProof();
+        } else if (method === 'Cash') {
             $('#cash-panel').removeClass('d-none');
             $('#qr-panel, #qr-note, #qr-confirm-row, #proof-upload').addClass('d-none');
             resetProof();
@@ -679,10 +682,11 @@ $(function () {
     function resetCheckoutFields() {
         $('#redeem-loyalty').prop('checked', false);
         $('#senior-pwd').prop('checked', false).trigger('change');
-        $('#cash-amount').val('');
+
         $('#pickup-at').val('');
+        $('input[name="pickup-timing"][value="now"]').prop('checked', true).trigger('change');
         $('input[name="fulfillment-method"][value="Pickup"]').prop('checked', true).trigger('change');
-        $('#delivery-address').val('');
+        $('.delivery-required, #delivery-landmark').val('');
         $('#qr-confirm').prop('checked', false);
         resetProof();
     }
@@ -707,7 +711,7 @@ $(function () {
         $checkout.addClass('is-open').attr('aria-hidden', 'false');
         syncScrollLock();
 
-        selectPaymentMethod('Cash');
+        selectPaymentMethod('');
 
         window.setTimeout(function () {
             document.getElementById('cash-amount')?.focus();
@@ -744,12 +748,19 @@ $(function () {
     function fulfillmentMethod() {
         return $('input[name="fulfillment-method"]:checked').val() || 'Pickup';
     }
+    function syncPickupTiming() {
+        const later = fulfillmentMethod() === 'Pickup' && $('input[name="pickup-timing"]:checked').val() === 'later';
+        $('#pickup-schedule').toggleClass('d-none', !later);
+        $('#pickup-at').prop('disabled', !later).prop('required', later);
+        if (!later) $('#pickup-at').val('');
+    }
+    $('input[name="pickup-timing"]').on('change', syncPickupTiming);
     $('input[name="fulfillment-method"]').on('change', function () {
         const delivery = fulfillmentMethod() === 'Delivery';
         $('#delivery-address-panel').toggleClass('d-none', !delivery);
-        $('#delivery-address').prop('required', delivery);
+        $('.delivery-required').prop('required', delivery);
         $('#pickup-time-panel').toggleClass('d-none', delivery);
-        $('#pickup-at').prop('disabled', delivery);
+        syncPickupTiming();
         if (delivery) $('#pickup-at').val('');
     });
     $('#loyalty-reward').on('change', function () {
@@ -786,7 +797,7 @@ $(function () {
         discountPreviewUrl = URL.createObjectURL(file);
         $('#discount-proof-preview').attr('src', discountPreviewUrl).removeClass('d-none');
     });
-    $('#cash-amount').on('input', updateCashFeedback);
+
 
     $('.payment-methods').on('change', 'input[name="payment-method"]', function () {
         selectPaymentMethod(String($(this).val()));
@@ -822,25 +833,23 @@ $(function () {
             .append($('<span class="proof-preview-name"></span>').text(file.name));
     });
 
-    $('.cash-quick').on('click', 'button', function () {
-        const value = String($(this).attr('data-cash'));
-
-        const currentCents = inputAmountCents($('#cash-amount').val()) ?? 0;
-        const nextCents = value === 'exact'
-            ? toCents(totalsNow().total)
-            : Math.min(currentCents + toCents(Number(value)), 9999999999);
-        $('#cash-amount').val((nextCents / 100).toFixed(2));
-        updateCashFeedback();
-    });
-
     $('#confirm-payment-btn').on('click', function () {
         const $button = $(this);
         if ($button.data('busy')) return;
 
         const totals = totalsNow();
+        if (fulfillmentMethod() === 'Pickup' && $('input[name="pickup-timing"]:checked').val() === 'later' && !document.getElementById('pickup-at').value) {
+            showCheckoutError('Choose a date and time for pickup later.');
+            document.getElementById('pickup-at').focus();
+            return;
+        }
         const totalCents = toCents(totals.total);
-        const cashCents = inputAmountCents($('#cash-amount').val());
+        const cashCents = 0;
         const method = paymentMethods[paymentMethod];
+        if (!method) {
+            showCheckoutError('Choose a payment method.');
+            return;
+        }
         let cash;
 
         if (!cart.length) {
@@ -849,19 +858,7 @@ $(function () {
         }
 
         if (paymentMethod === 'Cash') {
-            if (cashCents === null || cashCents < 1) {
-                showCheckoutError('Enter a valid cash amount with up to two decimal places.');
-                $('#cash-amount').trigger('focus');
-                return;
-            }
-
-            if (cashCents < totalCents) {
-                showCheckoutError('Insufficient cash. Enter an amount equal to or greater than the total.');
-                $('#cash-amount').trigger('focus');
-                return;
-            }
-
-            cash = cashCents / 100;
+            cash = 0;
         } else {
             if (!$('#qr-confirm').is(':checked')) {
                 showCheckoutError('Please confirm that you have sent the ' + method.label + ' payment.');
@@ -871,7 +868,7 @@ $(function () {
             cash = totals.total;
         }
 
-        const change = paymentMethod === 'Cash' ? (cashCents - totalCents) / 100 : 0;
+        const change = 0;
 
         hideCheckoutError();
         $button.data('busy', true).prop('disabled', true)
@@ -882,9 +879,10 @@ $(function () {
             $button.data('busy', false).prop('disabled', false).html(confirmLabel());
             return;
         }
-        if (fulfillmentMethod() === 'Delivery' && !$('#delivery-address').val().trim()) {
-            showCheckoutError('Enter your complete delivery address.');
-            $('#delivery-address').trigger('focus');
+        const missingAddress = $('.delivery-required').toArray().find(field => !field.value.trim() || !field.checkValidity());
+        if (fulfillmentMethod() === 'Delivery' && missingAddress) {
+            showCheckoutError('Complete your street address, barangay, city / municipality, and province.');
+            missingAddress.focus();
             $button.data('busy', false).prop('disabled', false).html(confirmLabel());
             return;
         }
@@ -917,7 +915,13 @@ $(function () {
             payment_method: paymentMethod,
             pickup_at: fulfillmentMethod() === 'Pickup' ? document.getElementById('pickup-at').value : '',
             fulfillment_method: fulfillmentMethod(),
-            delivery_address: fulfillmentMethod() === 'Delivery' ? $('#delivery-address').val().trim() : ''
+            delivery_address_parts: fulfillmentMethod() === 'Delivery' ? {
+                street: $('#delivery-address').val().trim(),
+                barangay: $('#delivery-barangay').val().trim(),
+                city: $('#delivery-city').val().trim(),
+                province: $('#delivery-province').val().trim(),
+                landmark: $('#delivery-landmark').val().trim()
+            } : null
         }));
 
         const proofFile = paymentMethod === 'Cash' ? null : selectedProofFile();
@@ -963,6 +967,11 @@ $(function () {
     });
 
     function completeOrder(orderId, totals, cash, change, method) {
+        const $ongoing = $('#ongoing-order-indicator');
+        const ongoingCount = (Number($ongoing.attr('data-count')) || 0) + 1;
+        $ongoing.attr('data-count', ongoingCount).text('You have ' + ongoingCount + ' ongoing order' + (ongoingCount === 1 ? '' : 's'));
+        $('#cash-order-number-panel').toggleClass('d-none', method !== 'Cash');
+        $('#cash-order-number').text(method === 'Cash' ? '#' + orderId : '');
         const $summary = $('#confirmation-body').empty();
         const $receipt = $('<section class="receipt-preview"></section>');
         const $watermark = $('<img class="receipt-watermark" alt="" aria-hidden="true">')
@@ -1112,4 +1121,5 @@ $(function () {
     });
 
     updateCount();
+    updateLoyaltyBalance(loyaltyBalance);
 });

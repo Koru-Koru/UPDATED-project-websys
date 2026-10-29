@@ -141,26 +141,46 @@ $favorites = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             <span class="feature-eyebrow">YOUR COFFEE REWARDS</span>
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <h2 class="h4 mb-0"><?= $pointsBalance ?> points</h2>
-                <a class="btn btn-outline-coffee" href="../index.php#menu">Order &amp; redeem</a>
             </div>
-            <p class="text-secondary small">1 Hot or Iced drink = 1 point after fulfillment. Choose from five rewards below. Points do not expire.</p>
+            <p class="text-secondary mb-3">1 Hot or Iced drink = 1 point after fulfillment. Choose from five rewards below. Points do not expire.</p>
             <div class="progress loyalty-progress" role="progressbar" aria-label="Progress to the next reward" aria-valuenow="<?= $pointsProgress ?>" aria-valuemin="0" aria-valuemax="<?= $nextReward['points'] ?>">
                 <div class="progress-bar" style="width:<?= round($pointsProgress / $nextReward['points'] * 100) ?>%"></div>
             </div>
             <p class="small mt-2"><?= $pointsBalance >= $nextReward['points'] ? 'All reward levels are unlocked!' : ($nextReward['points'] - $pointsBalance) . ' more points to unlock ' . h($nextReward['label']) . '.' ?></p>
             <div class="loyalty-rewards-grid mt-3">
                 <?php foreach ($rewards as $reward): ?>
+                    <?php $ready = $pointsBalance >= $reward['points'] && ($reward['stock'] ?? null) !== 0;
+                    $progress = min(max(0, $pointsBalance), $reward['points']); ?>
                     <div class="loyalty-reward-option <?= !empty($reward['image']) ? 'is-merchandise' : '' ?> <?= $pointsBalance >= $reward['points'] && ($reward['stock'] ?? null) !== 0 ? 'is-ready' : '' ?>">
                         <?php if (!empty($reward['image'])): ?><img class="reward-product-image" src="../<?= h($reward['image']) ?>" alt="<?= h($reward['label']) ?>" loading="lazy"><?php endif; ?>
                         <div class="reward-content">
-                        <strong><?= h($reward['label']) ?></strong>
-                        <?php if (!empty($reward['image'])): ?><small><?= $reward['stock'] === null ? 'Available' : (int)$reward['stock'] . ' left available' ?></small><?php endif; ?>
-                        <span><?= $reward['points'] ?> points</span>
-                        <small><?= ($reward['stock'] ?? null) === 0 ? 'Sold out' : ($pointsBalance >= $reward['points'] ? 'Ready to redeem' : ($reward['points'] - $pointsBalance) . ' points to go') ?></small>
+                        <div class="reward-heading">
+                            <strong class="<?= empty($reward['image']) ? 'coupon-title' : '' ?>"><?= h($reward['label']) ?></strong>
+                            <?php if (!empty($reward['image'])): ?>
+                                <span class="reward-availability <?= ($reward['stock'] ?? null) === 0 ? 'is-sold-out' : '' ?>"><?= ($reward['stock'] ?? null) === 0 ? 'Sold out' : (($reward['stock'] ?? null) === null ? 'Available' : (int)$reward['stock'] . ' left · Available') ?></span>
+                            <?php else: ?>
+                                <small>No minimum purchase*</small>
+                            <?php endif; ?>
+                        </div>
+                        <div class="reward-redemption-row">
+                            <div class="reward-progress-content">
+                                <span><?= $progress ?> / <?= (int)$reward['points'] ?> points</span>
+                                <div class="progress loyalty-progress" role="progressbar" aria-label="<?= h('Points toward ' . $reward['label']) ?>" aria-valuenow="<?= $progress ?>" aria-valuemin="0" aria-valuemax="<?= (int)$reward['points'] ?>">
+                                    <div class="progress-bar" style="width:<?= round($progress / $reward['points'] * 100) ?>%"></div>
+                                </div>
+                                <small><?= ($reward['stock'] ?? null) === 0 ? 'Currently unavailable' : ($ready ? 'Ready to redeem' : ($reward['points'] - $pointsBalance) . ' points to go') ?></small>
+                            </div>
+                            <?php if ($ready): ?>
+                                <a href="../index.php#menu" class="btn btn-outline-coffee btn-sm" aria-label="<?= h('Order and redeem ' . $reward['label']) ?>">Redeem</a>
+                            <?php else: ?>
+                                <button type="button" class="btn btn-outline-coffee btn-sm" disabled>Redeem</button>
+                            <?php endif; ?>
+                        </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
+            <p class="small text-secondary mt-3 mb-0">*Order total must exceed the coupon discount. Apply your reward at checkout.</p>
             <details class="mt-3"><summary class="fw-semibold">Points history (latest 20)</summary>
                 <?php if (!$pointsHistory): ?><p class="text-secondary mt-2 mb-0">Your points history will appear after your first fulfilled order.</p><?php else: ?>
                 <div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>Date</th><th>Order</th><th>Activity</th><th>Points</th></tr></thead><tbody>

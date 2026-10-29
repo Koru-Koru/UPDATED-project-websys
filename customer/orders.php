@@ -4,12 +4,14 @@ require_once __DIR__ . '/../includes/customer_auth.php';
 require_customer();
 
 $id = (int) $_SESSION['customer_id'];
+$ongoingOnly = ($_GET['ongoing'] ?? '') === '1';
 
 $stmt = $conn->prepare(
     'SELECT order_id, total, status, created_at
      FROM orders
-     WHERE customer_id = ?
-     ORDER BY created_at DESC'
+     WHERE customer_id = ?' .
+    ($ongoingOnly ? " AND status NOT IN ('Served', 'Delivered', 'Completed', 'Cancelled')" : '') .
+    ' ORDER BY created_at DESC'
 );
 $stmt->bind_param('i', $id);
 $stmt->execute();
@@ -45,9 +47,12 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <section class="card account-card border-0 shadow-sm">
         <div class="card-body p-4">
 
-            <h1 class="h3 title-font mb-2">My Orders</h1>
+            <h1 class="h3 title-font mb-2"><?= $ongoingOnly ? 'Ongoing Orders' : 'My Orders' ?></h1>
+            <?php if ($ongoingOnly): ?>
+                <a href="orders.php" class="btn btn-outline-coffee btn-sm mb-3">View All Orders</a>
+            <?php endif; ?>
             <p class="text-secondary mb-4">
-                View your past purchases and their current status.
+                <?= $ongoingOnly ? 'Check the status of orders being prepared for you.' : 'View your past purchases and their current status.' ?>
             </p>
 
             <?php if (empty($orders)): ?>
@@ -55,7 +60,7 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 <div class="text-center py-4">
                     <h2 class="h5">No Orders Yet</h2>
                     <p class="text-secondary">
-                        You haven't placed any orders yet.
+                        <?= $ongoingOnly ? 'You have no ongoing orders right now.' : "You haven't placed any orders yet." ?>
                     </p>
                     <a href="../index.php#menu" class="btn btn-coffee">
                         Browse the Menu
