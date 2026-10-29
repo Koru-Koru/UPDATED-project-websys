@@ -26,7 +26,7 @@ try {
     import_test_sql($testConn, $schema);
     $count = (int)$testConn->query('SELECT COUNT(*) n FROM products')->fetch_assoc()['n'];
     verify($count === 40, 'Fresh import creates all 40 menu products');
-    verify($testConn->query('SHOW TABLES')->num_rows === 13, 'Fresh import creates all 13 project tables');
+    verify($testConn->query('SHOW TABLES')->num_rows === 15, 'Fresh import creates all 15 project tables');
     import_test_sql($testConn, $schema);
     verify((int)$testConn->query('SELECT COUNT(*) n FROM products')->fetch_assoc()['n'] === $count, 'Repeated fresh import does not duplicate menu products');
     import_test_sql($testConn, $schema);
@@ -47,7 +47,7 @@ try {
     $testConn->query("INSERT INTO orders (customer_id,subtotal,discount,total,cash_received,change_amount,status) VALUES (1,777,0,777,800,23,'Completed')");
     $testConn->query("INSERT INTO order_items (order_id,product_id,product_name,quantity,unit_price,line_total) VALUES (1,1,'Americano',1,777,777)");
     import_test_sql($testConn, $schema);
-    verify($testConn->query('SHOW TABLES')->num_rows === 13, 'Update upgrades a legacy five-table database');
+    verify($testConn->query('SHOW TABLES')->num_rows === 15, 'Update upgrades a legacy five-table database');
     verify($testConn->query("SELECT password_hash FROM admins WHERE admin_id=1")->fetch_assoc()['password_hash'] === 'unchanged-password-hash', 'Admin credentials are preserved');
     $product = $testConn->query('SELECT * FROM products WHERE product_id=1')->fetch_assoc();
     verify($product['price'] === '777.00' && $product['image_url'] === 'custom.jpg' && $product['description'] === 'Keep my custom description', 'Existing menu prices, photos, and descriptions are preserved');

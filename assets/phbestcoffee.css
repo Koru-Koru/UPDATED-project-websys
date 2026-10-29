@@ -673,7 +673,8 @@ body.account-body {
 }
 
 /* cart trigger and drawer */
-.floating-cart-btn {
+.floating-cart-btn,
+.floating-dashboard-btn {
     position: fixed;
     right: max(1rem, env(safe-area-inset-right));
     bottom: max(1.5rem, env(safe-area-inset-bottom));
@@ -687,7 +688,8 @@ body.account-body {
     transition: transform .2s ease, box-shadow .2s ease;
 }
 
-.floating-cart-btn:hover {
+.floating-cart-btn:hover,
+.floating-dashboard-btn:hover {
     transform: translateY(-3px);
     box-shadow: 0 9px 28px #2d1c1350;
 }

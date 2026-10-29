@@ -1,0 +1,35 @@
+@media print {
+    @page { size: A4 landscape; margin: 12mm; }
+
+    body.analytics-page > main {
+        display: block !important;
+        max-width: none;
+        padding: 0 !important;
+        color: #222 !important;
+        background: #fff !important;
+        font-size: 10pt;
+    }
+
+    .analytics-page .analytics-print-heading { display: block !important; }
+    .analytics-page main > form,
+    .analytics-page .floating-dashboard-btn { display: none !important; }
+    .analytics-page .card,
+    .analytics-page .table,
+    .analytics-page .alert {
+        color: #222 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        border-color: #ccc !important;
+        break-inside: avoid;
+    }
+    .analytics-page .text-secondary { color: #555 !important; }
+    .analytics-page .col-xl-3 { width: 25%; }
+    .analytics-page .col-lg-8 { width: 66.666667%; }
+    .analytics-page .col-lg-4 { width: 33.333333%; }
+    .analytics-page .col-lg-7 { width: 58.333333%; }
+    .analytics-page .col-lg-5 { width: 41.666667%; }
+    .analytics-page canvas { max-width: 100% !important; max-height: 65mm; }
+    .analytics-page .table-responsive { overflow: visible; }
+    .analytics-page th,
+    .analytics-page td { color: #222 !important; background: #fff !important; }
+}

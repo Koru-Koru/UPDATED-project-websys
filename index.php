@@ -86,13 +86,6 @@ function render_products(array $items): void {
 
         <div class="ms-lg-3 mt-3 mt-lg-0 d-flex align-items-center gap-3">
 
-          <?php if (!empty($_SESSION['customer_id'])): ?>
-            <a class="cart-trigger text-decoration-none" href="customer/profile.php" title="My Account" aria-label="My Account">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 10a9 9 0 0 0-9 8h2a7 7 0 0 1 14 0h2a9 9 0 0 0-9-8Z"/>
-              </svg>
-            </a>
-          <?php else: ?>
             <div class="dropdown">
               <button id="account-menu-btn" class="cart-trigger" type="button"
                       data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account options" title="Account options">
@@ -101,13 +94,17 @@ function render_products(array $items): void {
                 </svg>
               </button>
               <ul class="dropdown-menu shadow" aria-labelledby="account-menu-btn">
+                <?php if (!empty($_SESSION['customer_id'])): ?>
+                <li><a class="dropdown-item" href="customer/profile.php">My Account</a></li>
+                <li><a class="dropdown-item" href="customer/logout.php">Log out</a></li>
+                <?php else: ?>
                 <li><a class="dropdown-item" href="customer/login.php">Sign in</a></li>
+                <?php endif; ?>
                 <li><a class="dropdown-item" href="customer/register.php">Create account</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item text-secondary" href="admin/login.php">Admin login</a></li>
               </ul>
             </div>
-          <?php endif; ?>
         </div>
       </div>
     </nav>

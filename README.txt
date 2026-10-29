@@ -89,6 +89,8 @@ CODE ORGANIZATION
 - includes/order_features.php: order status changes, stock restoration, reset tokens.
 - assets/order-progress.js: customer order tracking updates.
 - assets/admin-products.js: product picker and bulk stock selection.
+- assets/admin-analytics.js: report date controls and PDF print events.
+- assets/analytics-print.css: print layout for analytics PDF exports.
 - assets/admin-merchandise.js: merchandise collection confirmation.
 - assets/customer-rewards.js: customer reward confirmation form.
 - includes/admin_activity.php: shared admin activity recording.

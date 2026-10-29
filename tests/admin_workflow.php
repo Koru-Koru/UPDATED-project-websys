@@ -1,4 +1,8 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
 // Runs against a disposable clone. Existing customer records are never changed.
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/order_features.php';

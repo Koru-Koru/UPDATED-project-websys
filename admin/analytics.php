@@ -156,13 +156,15 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
     <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <?php account_theme_assets(); ?>
+    <link rel="stylesheet" href="../assets/analytics-print.css?v=<?= filemtime(__DIR__ . '/../assets/analytics-print.css') ?>">
 </head>
 
-<body class="admin-page">
+<body class="admin-page analytics-page">
 
 <?php admin_navbar(); ?>
 
 <main class="container py-4">
+    <p class="analytics-print-heading d-none">Philippines' Best Coffee · <?= h(date('M j, Y', strtotime($startDate))) ?> – <?= h(date('M j, Y', strtotime($endDate))) ?></p>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
@@ -184,9 +186,9 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
         ingredient costs and other business expenses.
     </div>
 
-    <form class="card card-body shadow-sm mb-4" method="get">
+    <form class="card admin-card card-body shadow-sm mb-4 p-4" method="get" id="analytics-filter" data-export-pdf="<?= ($_GET['format'] ?? '') === 'pdf' ? '1' : '0' ?>">
         <div class="row g-3 align-items-end">
-            <div class="col-sm-5 col-md-4">
+            <div class="col-md-6 col-xl-3">
                 <label class="form-label" for="start_date">From Date</label>
                 <input
                     class="form-control"
@@ -199,7 +201,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
                 >
             </div>
 
-            <div class="col-sm-5 col-md-4">
+            <div class="col-md-6 col-xl-3">
                 <label class="form-label" for="end_date">To Date</label>
                 <input
                     class="form-control"
@@ -212,10 +214,13 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
                 >
             </div>
 
-            <div class="col-sm-2 col-md-4 d-flex gap-2">
-                <button class="btn btn-coffee" type="submit">View Report</button>
-                <button class="btn btn-outline-coffee" type="submit" formaction="export_sales.php">Export CSV</button>
-                <a href="analytics.php" class="btn btn-outline-secondary">Reset</a>
+            <div class="col-xl-6">
+                <div class="row g-2">
+                    <div class="col-6 col-sm-3 d-grid"><button class="btn btn-coffee text-nowrap" type="submit">View Report</button></div>
+                    <div class="col-6 col-sm-3 d-grid"><button class="btn btn-outline-coffee text-nowrap" type="submit" formaction="export_sales.php">Export CSV</button></div>
+                    <div class="col-6 col-sm-3 d-grid"><button class="btn btn-outline-coffee text-nowrap" type="submit" name="format" value="pdf">Export PDF</button></div>
+                    <div class="col-6 col-sm-3 d-grid"><a href="analytics.php" class="btn btn-outline-coffee">Reset</a></div>
+                </div>
             </div>
         </div>
     </form>
@@ -389,11 +394,10 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
 
     </div>
 
-    <a href="dashboard.php" class="btn btn-outline-coffee mt-4">
-        Back to Dashboard
-    </a>
-
 </main>
+<a href="dashboard.php" class="btn btn-coffee floating-dashboard-btn">
+    <span aria-hidden="true">←</span> Back to Dashboard
+</a>
 
 <script>
 const salesLabels = <?= json_encode($labels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
@@ -471,6 +475,8 @@ new MutationObserver(updateChartTheme).observe(document.documentElement, {
 });
 </script>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../assets/admin-analytics.js?v=<?= filemtime(__DIR__ . '/../assets/admin-analytics.js') ?>"></script>
 </body>
 </html>
