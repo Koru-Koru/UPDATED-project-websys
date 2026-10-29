@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
 require_customer();
@@ -18,6 +17,7 @@ if (!$customer) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $name = trim($_POST['full_name'] ?? '');
     $email = strtolower(trim($_POST['email'] ?? ''));
     $phone = trim($_POST['phone'] ?? '');
@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Account Settings | Philippines' Best Coffee</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 <body class="account-body">
 
@@ -155,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endforeach; ?>
 
         <form method="post">
+            <?= csrf_field() ?>
             <h2 class="h5 mt-2">Personal Information</h2>
 
             <div class="mb-3">

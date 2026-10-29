@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 
+require_once __DIR__ . '/../includes/order_features.php';
 require_admin();
 
 $allowedStatuses = [
@@ -15,6 +16,7 @@ $allowedStatuses = [
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $orderId = filter_input(INPUT_POST, 'order_id', FILTER_VALIDATE_INT) ?: 0;
     $status = (string) ($_POST['status'] ?? '');
 
@@ -22,20 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         set_flash('Invalid order or status.', 'danger');
     } else {
         try {
-            $stmt = $conn->prepare(
-                'UPDATE orders SET status = ? WHERE order_id = ?'
-            );
-
-            $stmt->bind_param('si', $status, $orderId);
-            $stmt->execute();
+            update_order_status($conn, $orderId, $status);
 
             set_flash(
                 "Order #$orderId status updated to $status.",
                 'success'
             );
-        } catch (mysqli_sql_exception $e) {
+        } catch (Throwable $e) {
             set_flash(
-                'Could not update the order status. Check your database setup and run database_update_order_status.sql if needed.',
+                $e instanceof mysqli_sql_exception ? 'Could not update the order. Please try again.' : $e->getMessage(),
                 'danger'
             );
         }
@@ -47,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $sql = "
    SELECT
-    o.order_id,
+    o.*,
     (
         SELECT COUNT(*)
         FROM orders earlier
@@ -60,9 +57,6 @@ $sql = "
               )
           )
     ) AS customer_order_number,
-    o.total,
-    o.status,
-    o.created_at,
     c.full_name,
     c.email,
     c.phone
@@ -83,7 +77,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
     <title>Order Management | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="admin-page">
@@ -160,6 +154,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                 <th>Date</th>
                                 <th>Total</th>
                                 <th>Status</th>
+                                <th>Proof of Payment</th>
                                 <th>Update Status</th>
                                 <th>Details</th>
                             </tr>
@@ -220,6 +215,38 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                         <span class="badge <?= $badgeClass ?>">
                                             <?= h($status) ?>
                                         </span>
+                                        <div class="small mt-2">
+                                            <a href="review_order.php?id=<?= (int)$order['order_id'] ?>">Review documents</a>
+                                            <div>Payment: <?= h($order['payment_review']) ?></div>
+                                            <div>ID: <?= h($order['id_review']) ?></div>
+                                            <div>Pickup: <?= h($order['pickup_at'] ?: 'As soon as ready') ?></div>
+                                        </div>
+                                        <div class="small text-secondary mt-1">
+                                            <?= h($order['payment_method'] ?? 'Cash') ?>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <?php if ((float) $order['discount'] > 0): ?>
+                                            <a class="d-block small mb-2" href="discount_proof.php?id=<?= (int) $order['order_id'] ?>" target="_blank" rel="noopener">Review Senior / PWD ID</a>
+                                        <?php endif; ?>                                        <?php if (!empty($order['payment_proof'])): ?>
+                                            <a
+                                                href="../<?= h($order['payment_proof']) ?>"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="d-inline-flex align-items-center gap-2 text-decoration-none"
+                                                title="Open proof of payment for order #<?= (int) $order['order_id'] ?>"
+                                            >
+                                                <img
+                                                    src="../<?= h($order['payment_proof']) ?>"
+                                                    alt="Proof of payment for order #<?= (int) $order['order_id'] ?>"
+                                                    style="width:48px;height:48px;object-fit:cover;border-radius:.4rem;border:1px solid #ddd;"
+                                                >
+                                                <span class="small">View</span>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="text-secondary small">—</span>
+                                        <?php endif; ?>
                                     </td>
 
                                     <td>
@@ -229,6 +256,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                             class="d-flex gap-2"
                                             style="min-width: 230px;"
                                         >
+                                            <?= csrf_field() ?>
                                             <input
                                                 type="hidden"
                                                 name="order_id"
@@ -242,6 +270,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
                                                 required
                                             >
                                                 <?php foreach ($allowedStatuses as $option): ?>
+                                                    <?php if (!order_transition_allowed($status, $option)) continue; ?>
                                                     <option
                                                         value="<?= h($option) ?>"
                                                         <?= $status === $option ? 'selected' : '' ?>

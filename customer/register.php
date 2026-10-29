@@ -12,6 +12,7 @@ $email = '';
 $phone = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $name = trim($_POST['full_name'] ?? '');
     $email = strtolower(trim($_POST['email'] ?? ''));
     $phone = trim($_POST['phone'] ?? '');
@@ -41,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$errors) {
         try {
             $stmt = $conn->prepare(
-                'SELECT customer_id, password_hash
+                'SELECT customer_id
                  FROM customers
                  WHERE email = ?
                  LIMIT 1'
@@ -52,33 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $existing = $stmt->get_result()->fetch_assoc();
 
             if ($existing) {
-                if (!empty($existing['password_hash'])) {
-                    $errors[] = 'An account with this email already exists. Please sign in.';
-                } else {
-                    $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $customerId = (int) $existing['customer_id'];
-
-                    $stmt = $conn->prepare(
-                        'UPDATE customers
-                         SET full_name = ?, phone = ?, password_hash = ?
-                         WHERE customer_id = ?'
-                    );
-                    $stmt->bind_param(
-                        'sssi',
-                        $name,
-                        $phone,
-                        $hash,
-                        $customerId
-                    );
-                    $stmt->execute();
-
-                    session_regenerate_id(true);
-                    $_SESSION['customer_id'] = $customerId;
-                    $_SESSION['customer_name'] = $name;
-
-                    header('Location: profile.php');
-                    exit;
-                }
+                $errors[] = 'This email is already registered. Sign in or contact the shop for help accessing your account.';
             } else {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
 
@@ -121,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
         rel="stylesheet"
     >
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 <body class="account-body">
 
@@ -161,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php show_flash(); ?>
 
         <form method="post" action="">
+            <?= csrf_field() ?>
             <div class="mb-3">
                 <label for="full_name" class="form-label">Full Name</label>
                 <input

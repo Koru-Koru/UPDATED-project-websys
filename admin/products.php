@@ -5,8 +5,10 @@ require_once __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $categories = ['Hot', 'Iced', 'Snacks and Bites'];
+$stockSupported = products_support_stock($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $action = $_POST['action'] ?? '';
     $id = (int) ($_POST['product_id'] ?? 0);
 
@@ -32,6 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $image = trim($_POST['image_url'] ?? '');
     $available = isset($_POST['is_available']) ? 1 : 0;
 
+    // Blank stock means unlimited servings; otherwise a whole number >= 0.
+    $stockRaw = trim($_POST['stock'] ?? '');
+    $stock = null;
+
+    if ($stockRaw !== '') {
+        $stock = filter_var($stockRaw, FILTER_VALIDATE_INT);
+
+        if ($stock === false || $stock < 0 || $stock > 1000000) {
+            $stock = false;
+        }
+    }
+
     if (
         $name === '' ||
         $description === '' ||
@@ -39,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price === false ||
         $price === null ||
         $price < 0 ||
+        $stock === false ||
         (
             $image !== '' &&
             !filter_var($image, FILTER_VALIDATE_URL) &&
@@ -55,39 +70,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($action === 'edit' && $id > 0) {
-            $stmt = $conn->prepare(
-                'UPDATE products
-                 SET name = ?, category = ?, description = ?, price = ?,
-                     image_url = ?, is_available = ?
-                 WHERE product_id = ?'
-            );
+            if ($stockSupported) {
+                $stmt = $conn->prepare(
+                    'UPDATE products
+                     SET name = ?, category = ?, description = ?, price = ?,
+                         image_url = ?, is_available = ?, stock = ?
+                     WHERE product_id = ?'
+                );
 
-            $stmt->bind_param(
-                'sssdsii',
-                $name,
-                $category,
-                $description,
-                $price,
-                $image,
-                $available,
-                $id
-            );
+                $stmt->bind_param(
+                    'sssdsiii',
+                    $name,
+                    $category,
+                    $description,
+                    $price,
+                    $image,
+                    $available,
+                    $stock,
+                    $id
+                );
+            } else {
+                $stmt = $conn->prepare(
+                    'UPDATE products
+                     SET name = ?, category = ?, description = ?, price = ?,
+                         image_url = ?, is_available = ?
+                     WHERE product_id = ?'
+                );
+
+                $stmt->bind_param(
+                    'sssdsii',
+                    $name,
+                    $category,
+                    $description,
+                    $price,
+                    $image,
+                    $available,
+                    $id
+                );
+            }
         } elseif ($action === 'add') {
-            $stmt = $conn->prepare(
-                'INSERT INTO products
-                 (name, category, description, price, image_url, is_available)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            );
+            if ($stockSupported) {
+                $stmt = $conn->prepare(
+                    'INSERT INTO products
+                     (name, category, description, price, image_url, is_available, stock)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)'
+                );
 
-            $stmt->bind_param(
-                'sssdsi',
-                $name,
-                $category,
-                $description,
-                $price,
-                $image,
-                $available
-            );
+                $stmt->bind_param(
+                    'sssdsii',
+                    $name,
+                    $category,
+                    $description,
+                    $price,
+                    $image,
+                    $available,
+                    $stock
+                );
+            } else {
+                $stmt = $conn->prepare(
+                    'INSERT INTO products
+                     (name, category, description, price, image_url, is_available)
+                     VALUES (?, ?, ?, ?, ?, ?)'
+                );
+
+                $stmt->bind_param(
+                    'sssdsi',
+                    $name,
+                    $category,
+                    $description,
+                    $price,
+                    $image,
+                    $available
+                );
+            }
         } else {
             set_flash('Invalid product action.', 'danger');
             header('Location: products.php');
@@ -133,7 +188,7 @@ $formAction = $editProduct ? 'edit' : 'add';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Product Maintenance | Philippines' Best Coffee</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="admin-page">
@@ -147,9 +202,10 @@ $formAction = $editProduct ? 'edit' : 'add';
             </a>
             <div class="d-flex align-items-center gap-2">
                 <span class="navbar-text d-none d-md-inline">
-                Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
-            </span>
-            <a href="logout.php" class="btn btn-sm btn-outline-light">Log out</a>
+                    Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
+                </span>
+                <a href="logout.php" class="btn btn-sm btn-outline-light">Log out</a>
+            </div>
         </div>
     </nav>
 
@@ -171,6 +227,7 @@ $formAction = $editProduct ? 'edit' : 'add';
                 </h2>
 
                 <form method="post" class="row g-3">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="action" value="<?= h($formAction) ?>">
                     <input type="hidden" name="product_id" value="<?= (int) ($editProduct['product_id'] ?? 0) ?>">
 
@@ -197,6 +254,15 @@ $formAction = $editProduct ? 'edit' : 'add';
                         <input id="price" class="form-control" type="number" name="price"
                                min="0" step="0.01" required
                                value="<?= h($editProduct['price'] ?? '') ?>">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="stock" class="form-label">Stock (servings)</label>
+                        <input id="stock" class="form-control" type="number" name="stock"
+                               min="0" max="1000000" step="1" inputmode="numeric"
+                               placeholder="Unlimited"
+                               value="<?= isset($editProduct['stock']) && $editProduct['stock'] !== null ? (int) $editProduct['stock'] : '' ?>">
+                        <div class="form-text">How many servings customers can order. Leave blank for unlimited; 0 marks it sold out.</div>
                     </div>
 
                     <div class="col-12">
@@ -248,6 +314,7 @@ $formAction = $editProduct ? 'edit' : 'add';
                                 <th>Product</th>
                                 <th>Category</th>
                                 <th>Price</th>
+                                <th>Stock</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -259,6 +326,15 @@ $formAction = $editProduct ? 'edit' : 'add';
                                     <td><?= h($product['name']) ?></td>
                                     <td><?= h($product['category']) ?></td>
                                     <td>₱<?= number_format((float) $product['price'], 2) ?></td>
+                                    <td>
+                                        <?php if (!array_key_exists('stock', $product) || $product['stock'] === null): ?>
+                                            <span class="badge text-bg-secondary">Unlimited</span>
+                                        <?php elseif ((int) $product['stock'] <= 0): ?>
+                                            <span class="badge text-bg-danger">Sold out</span>
+                                        <?php else: ?>
+                                            <span class="badge text-bg-success"><?= (int) $product['stock'] ?> left</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <span class="badge text-bg-<?= $product['is_available'] ? 'success' : 'secondary' ?>">
                                             <?= $product['is_available'] ? 'Available' : 'Unavailable' ?>
@@ -272,6 +348,7 @@ $formAction = $editProduct ? 'edit' : 'add';
 
                                         <form method="post" class="d-inline"
                                               onsubmit="return confirm('Delete this product?');">
+                                            <?= csrf_field() ?>
                                             <input type="hidden" name="action" value="delete">
                                             <input type="hidden" name="product_id"
                                                    value="<?= (int) $product['product_id'] ?>">
@@ -285,7 +362,7 @@ $formAction = $editProduct ? 'edit' : 'add';
 
                             <?php if (!$products): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center text-secondary">
+                                    <td colspan="7" class="text-center text-secondary">
                                         No products found. Add a product using the form above.
                                     </td>
                                 </tr>

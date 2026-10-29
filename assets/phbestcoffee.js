@@ -1,58 +1,125 @@
 $(function () {
-    const $slides = $('.slide');
-    let slideIndex = 0;
-    let cart = [];
+    'use strict';
 
-    try {
-        const saved = localStorage.getItem('phbestcoffee-cart');
-        cart = saved ? JSON.parse(saved) : [];
-        if (!Array.isArray(cart)) cart = [];
-    } catch (error) {
-        cart = [];
-    }
+    const CART_KEY = 'phbestcoffee-cart';
+    const MAX_QTY = 50;
+    const MAX_LINES = 50;
+    const MAX_PROOF_BYTES = 5 * 1024 * 1024;
+    const PROOF_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-    const peso = amount => '₱' + Number(amount || 0).toFixed(2);
+    const $drawer = $('#cart-modal');
+    const $checkout = $('#checkout-modal');
+    const $confirmation = $('#confirmation-modal');
+    const signedIn = String($drawer.data('signed-in')) === '1';
 
-    const saveCart = () => {
-        try {
-            localStorage.setItem('phbestcoffee-cart', JSON.stringify(cart));
-        } catch (error) {}
+    const paymentMethods = {
+        Cash: {
+            label: 'Cash'
+        },
+        GCash: {
+            label: 'GCash',
+            image: 'assets/payments/gcash-qr.jpg',
+            alt: 'GCash payment QR code',
+            account: ''
+        },
+        Maya: {
+            label: 'Maya',
+            image: 'assets/payments/maya-qr.jpg',
+            alt: 'Maya payment QR code',
+            account: 'Kenneth Cole Alcantara · @koruu · +63 *** *** 6925'
+        },
+        GoTyme: {
+            label: 'GoTyme',
+            image: 'assets/payments/gotyme-qr.jpg',
+            alt: 'GoTyme Bank transfer QR code',
+            account: 'Kenneth Cole Alcantara · GoTyme Bank •••••• 5276'
+        }
     };
 
-    const itemCount = () => cart.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotalCents = () => cart.reduce(
-        (sum, item) => sum + Math.round(item.price * 100) * item.quantity,
-        0
-    );
-    const subtotal = () => subtotalCents() / 100;
+    let paymentMethod = 'Cash';
 
-    function cartIsValid() {
-        const seenIds = new Set();
+    let cart = [];
+    let slideIndex = 0;
+    let lastFocused = null;
+    let proofPreviewUrl = null;
 
-        return cart.length > 0 && cart.length <= 50 && cart.every(function (item) {
-            const id = Number(item.id);
-            const priceCents = Number(item.price) * 100;
+    const peso = value => '₱' + (Number(value) || 0).toFixed(2);
+    const toCents = value => Math.round((Number(value) || 0) * 100);
 
-            if (
-                !Number.isSafeInteger(id) || id < 1 ||
-                !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50 ||
-                typeof item.name !== 'string' || item.name.trim() === '' ||
-                !Number.isFinite(priceCents) || !Number.isSafeInteger(Math.round(priceCents)) ||
-                Math.abs(priceCents - Math.round(priceCents)) > 0.0001 ||
-                item.price < 0 || seenIds.has(id)
-            ) {
-                return false;
-            }
+    /* ------------------------------------------------------------------
+       Cart storage
+    ------------------------------------------------------------------ */
 
-            seenIds.add(id);
-            return true;
-        });
+    function saveCart() {
+        try {
+            localStorage.setItem(CART_KEY, JSON.stringify(cart));
+        } catch (error) {}
     }
 
-    if (cart.length && !cartIsValid()) {
-        cart = [];
-        saveCart();
-        alert('Your saved cart contained invalid items or quantities and was cleared. Please add the products again.');
+    function normalizeCart(raw) {
+        if (!Array.isArray(raw) || raw.length > MAX_LINES) return null;
+
+        const seen = new Set();
+        const clean = [];
+
+        for (let index = 0; index < raw.length; index += 1) {
+            const item = raw[index] || {};
+            const id = Number(item.id);
+            const price = Number(item.price);
+            const quantity = Number(item.quantity);
+            const priceCents = price * 100;
+
+            if (!Number.isSafeInteger(id) || id < 1 || seen.has(id)) return null;
+            if (typeof item.name !== 'string' || item.name.trim() === '') return null;
+            if (!Number.isFinite(price) || price < 0) return null;
+            if (Math.abs(priceCents - Math.round(priceCents)) > 0.0001) return null;
+            if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) return null;
+
+            seen.add(id);
+            clean.push({
+                id: id,
+                name: item.name.trim().slice(0, 120),
+                price: Math.round(priceCents) / 100,
+                quantity: quantity,
+                image: typeof item.image === 'string' ? item.image : ''
+            });
+        }
+
+        return clean;
+    }
+
+    (function loadCart() {
+        let raw = [];
+
+        try {
+            raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+        } catch (error) {
+            raw = [];
+        }
+
+        const clean = normalizeCart(raw);
+
+        if (clean === null) {
+            cart = [];
+            saveCart();
+            window.setTimeout(function () {
+                showToast('Your saved cart had invalid items and was cleared.', { icon: '!', tone: 'warning' });
+            }, 700);
+        } else {
+            cart = clean;
+        }
+    }());
+
+    function itemCount() {
+        return cart.reduce((sum, item) => sum + item.quantity, 0);
+    }
+
+    function subtotalCents() {
+        return cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0);
+    }
+
+    function subtotal() {
+        return subtotalCents() / 100;
     }
 
     function inputAmountCents(value) {
@@ -65,13 +132,65 @@ $(function () {
         return Math.round(amount * 100);
     }
 
+    /* ------------------------------------------------------------------
+       Toasts
+    ------------------------------------------------------------------ */
+
+    function showToast(message, options) {
+        const settings = options || {};
+        const $toast = $('<div class="toast toast-coffee" role="status" aria-live="polite" aria-atomic="true"></div>');
+        const $body = $('<div class="d-flex align-items-center gap-2"></div>').appendTo($toast);
+
+        if (settings.tone === 'warning') $toast.addClass('is-warning');
+
+        $('<span class="toast-icon" aria-hidden="true"></span>')
+            .text(settings.icon || '✓')
+            .appendTo($body);
+
+        $('<div class="toast-message flex-grow-1"></div>')
+            .text(message)
+            .appendTo($body);
+
+        if (settings.actionLabel) {
+            $('<button type="button" class="btn btn-toast-action flex-shrink-0"></button>')
+                .text(settings.actionLabel)
+                .on('click', function () {
+                    if (typeof settings.onAction === 'function') settings.onAction();
+                    toast.hide();
+                })
+                .appendTo($body);
+        }
+
+        $('<button type="button" class="btn-close btn-close-white ms-1" data-bs-dismiss="toast" aria-label="Close"></button>')
+            .appendTo($body);
+
+        $('#toast-stack').append($toast);
+
+        const toast = new bootstrap.Toast($toast[0], {
+            delay: settings.delay || 3400,
+            autohide: true
+        });
+
+        $toast.on('hidden.bs.toast', function () {
+            $toast.remove();
+        });
+
+        toast.show();
+    }
+
+    /* ------------------------------------------------------------------
+       Slideshow, tabs, hero
+    ------------------------------------------------------------------ */
+
+    const $slides = $('.slide');
+
     function showSlide(index) {
         $slides.removeClass('active').eq(index).addClass('active');
     }
 
     if ($slides.length) {
         showSlide(slideIndex);
-        setInterval(function () {
+        window.setInterval(function () {
             slideIndex = (slideIndex + 1) % $slides.length;
             showSlide(slideIndex);
         }, 5000);
@@ -89,64 +208,9 @@ $(function () {
         document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
     });
 
-    function updateCount() {
-        $('#cart-count').text(itemCount());
-    }
-
-    function renderCart() {
-        const $items = $('#cart-items').empty();
-
-        if (!cart.length) {
-            $items.html('<p class="text-secondary">Your cart is empty.</p>');
-        } else {
-            cart.forEach(function (item, index) {
-                const $row = $('<div class="d-flex justify-content-between align-items-center gap-3 mb-3 border-bottom pb-3"></div>');
-                const $details = $('<div></div>');
-                const $actions = $('<div class="d-flex align-items-center gap-1 flex-shrink-0"></div>');
-
-                $('<div class="fw-semibold"></div>').text(item.name).appendTo($details);
-                $('<div class="small text-secondary"></div>')
-                    .text(peso(item.price) + ' × ' + item.quantity)
-                    .appendTo($details);
-
-                $('<button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Decrease quantity">−</button>')
-                    .on('click', function () {
-                        item.quantity = Math.max(1, item.quantity - 1);
-                        saveCart();
-                        renderCart();
-                        updateCount();
-                    })
-                    .appendTo($actions);
-
-                $('<button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Increase quantity">+</button>')
-                    .on('click', function () {
-                        if (item.quantity >= 50) {
-                            alert('A maximum of 50 units is allowed per product.');
-                            return;
-                        }
-                        item.quantity += 1;
-                        saveCart();
-                        renderCart();
-                        updateCount();
-                    })
-                    .prop('disabled', item.quantity >= 50)
-                    .appendTo($actions);
-
-                $('<button type="button" class="btn btn-sm btn-outline-danger">Remove</button>')
-                    .on('click', function () {
-                        cart.splice(index, 1);
-                        saveCart();
-                        renderCart();
-                        updateCount();
-                    })
-                    .appendTo($actions);
-
-                $row.append($details, $actions).appendTo($items);
-            });
-        }
-
-        $('#cart-total').text('Total: ' + peso(subtotal()));
-    }
+    /* ------------------------------------------------------------------
+       Menu quantity steppers
+    ------------------------------------------------------------------ */
 
     $('.quantity-minus').on('click', function () {
         const $input = $(this).siblings('.menu-quantity-input');
@@ -155,24 +219,240 @@ $(function () {
 
     $('.quantity-plus').on('click', function () {
         const $input = $(this).siblings('.menu-quantity-input');
-        $input.val(Math.min(50, (parseInt($input.val(), 10) || 1) + 1));
+        const max = Math.min(MAX_QTY, parseInt($input.attr('max'), 10) || MAX_QTY);
+        $input.val(Math.min(max, (parseInt($input.val(), 10) || 1) + 1));
     });
 
     $('.menu-quantity-input').on('change', function () {
-        const quantity = Number($(this).val());
-        $(this).val(Number.isInteger(quantity) ? Math.min(50, Math.max(1, quantity)) : 1);
+        const $input = $(this);
+        const max = Math.min(MAX_QTY, parseInt($input.attr('max'), 10) || MAX_QTY);
+        const quantity = Number($input.val());
+        $input.val(Number.isInteger(quantity) ? Math.min(max, Math.max(1, quantity)) : 1);
     });
+
+    /* ------------------------------------------------------------------
+       Cart badge
+    ------------------------------------------------------------------ */
+
+    function updateCount(pop) {
+        const count = itemCount();
+        const $badge = $('#cart-count');
+
+        $badge.text(count).toggleClass('is-empty', count === 0);
+        $('#cart-open-btn').attr('aria-label', count ? 'Open cart, ' + count + ' item' + (count === 1 ? '' : 's') : 'Open cart, empty');
+
+        if (pop) {
+            $badge.removeClass('pop');
+            void $badge[0].offsetWidth;
+            $badge.addClass('pop');
+        }
+    }
+
+    /* ------------------------------------------------------------------
+       Cart drawer
+    ------------------------------------------------------------------ */
+
+    function anyOverlayOpen() {
+        return $drawer.hasClass('show') || $checkout.hasClass('is-open') || $confirmation.hasClass('is-open');
+    }
+
+    function syncScrollLock() {
+        $('body').toggleClass('cart-scroll-lock', anyOverlayOpen());
+    }
+
+    function openCart() {
+        if (!$drawer.hasClass('show')) lastFocused = document.activeElement;
+        renderCart();
+
+        $('#cart-backdrop').addClass('show');
+        $drawer.addClass('show').attr('aria-hidden', 'false');
+        $('#cart-open-btn').attr('aria-expanded', 'true');
+        syncScrollLock();
+
+        window.setTimeout(function () {
+            document.getElementById('close-cart-btn')?.focus();
+        }, 160);
+    }
+
+    function closeCart(options) {
+        const settings = options || {};
+
+        $('#cart-backdrop').removeClass('show');
+        $drawer.removeClass('show').attr('aria-hidden', 'true');
+        $('#cart-open-btn').attr('aria-expanded', 'false');
+        syncScrollLock();
+
+        if (settings.restoreFocus !== false && lastFocused && typeof lastFocused.focus === 'function') {
+            lastFocused.focus();
+        }
+    }
+
+    function cartLine(item) {
+        const $line = $('<article class="cart-line"></article>').attr('data-id', item.id);
+        const $thumbWrap = $('<div class="cart-line-thumb-wrap"></div>');
+
+        if (item.image) {
+            $('<img class="cart-line-thumb" alt="">')
+                .attr('src', item.image)
+                .on('error', function () {
+                    $(this).replaceWith('<span class="cart-line-thumb cart-line-thumb-fallback" aria-hidden="true">☕</span>');
+                })
+                .appendTo($thumbWrap);
+        } else {
+            $('<span class="cart-line-thumb cart-line-thumb-fallback" aria-hidden="true">☕</span>').appendTo($thumbWrap);
+        }
+
+        const $main = $('<div class="cart-line-main"></div>');
+        $('<h5 class="cart-line-name"></h5>').text(item.name).appendTo($main);
+        $('<p class="cart-line-price"></p>').text(peso(item.price) + ' each').appendTo($main);
+
+        const $qty = $('<div class="cart-qty" role="group"></div>').attr('aria-label', 'Quantity for ' + item.name);
+        $('<button type="button" class="cart-qty-btn" data-cart-action="dec" aria-label="Decrease quantity">−</button>')
+            .prop('disabled', item.quantity <= 1)
+            .appendTo($qty);
+        $('<span class="cart-qty-value" aria-live="polite"></span>').text(item.quantity).appendTo($qty);
+        $('<button type="button" class="cart-qty-btn" data-cart-action="inc" aria-label="Increase quantity">+</button>')
+            .prop('disabled', item.quantity >= MAX_QTY)
+            .appendTo($qty);
+        $main.append($qty);
+
+        const $side = $('<div class="cart-line-side"></div>');
+        $('<strong class="cart-line-total"></strong>').text(peso(item.price * item.quantity)).appendTo($side);
+        $('<button type="button" class="cart-line-remove" data-cart-action="remove"></button>')
+            .text('Remove')
+            .attr('aria-label', 'Remove ' + item.name + ' from cart')
+            .appendTo($side);
+
+        return $line.append($thumbWrap, $main, $side);
+    }
+
+    function renderCart() {
+        const $items = $('#cart-items').empty();
+        const count = itemCount();
+
+        $('#cart-item-count').text(count === 1 ? '1 item' : count + ' items');
+
+        if (!cart.length) {
+            const $empty = $('<div class="cart-empty"></div>');
+            $('<div class="cart-empty-icon" aria-hidden="true">☕</div>').appendTo($empty);
+            $('<h4 class="title-font h5 mb-1"></h4>').text('Your cart is empty').appendTo($empty);
+            $('<p class="text-secondary small mb-4"></p>')
+                .text('Add a drink or a snack from the menu to get started.')
+                .appendTo($empty);
+            $('<button type="button" class="btn btn-coffee px-4"></button>')
+                .text('Browse the menu')
+                .on('click', function () {
+                    closeCart({ restoreFocus: false });
+                    document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
+                })
+                .appendTo($empty);
+
+            $items.append($empty);
+            $('#cart-summary').addClass('d-none');
+            $('#clear-cart-btn').addClass('d-none');
+            $('.cart-drawer-links').addClass('is-empty');
+            $('#checkout-btn').prop('disabled', true).text('Checkout');
+        } else {
+            cart.forEach(function (item) {
+                $items.append(cartLine(item));
+            });
+
+            $('#cart-summary').removeClass('d-none');
+            $('#clear-cart-btn').removeClass('d-none');
+            $('.cart-drawer-links').removeClass('is-empty');
+            $('#checkout-btn')
+                .prop('disabled', false)
+                .text(signedIn ? 'Checkout · ' + peso(subtotal()) : 'Sign in to Checkout');
+
+            $('#cart-subtotal, #cart-total').text(peso(subtotal()));
+        }
+    }
+
+    $('#cart-items').on('click', '[data-cart-action]', function () {
+        const $line = $(this).closest('.cart-line');
+        const id = Number($line.attr('data-id'));
+        const item = cart.find(row => row.id === id);
+        if (!item) return;
+
+        const action = $(this).attr('data-cart-action');
+
+        if (action === 'inc' && item.quantity < MAX_QTY) {
+            item.quantity += 1;
+        } else if (action === 'dec' && item.quantity > 1) {
+            item.quantity -= 1;
+        } else if (action === 'remove') {
+            const removed = item;
+            const position = cart.indexOf(item);
+
+            cart = cart.filter(row => row !== item);
+            saveCart();
+            renderCart();
+            updateCount();
+
+            showToast(removed.name + ' removed', {
+                icon: '×',
+                actionLabel: 'Undo',
+                onAction: function () {
+                    if (cart.length >= MAX_LINES || cart.some(row => row.id === removed.id)) return;
+                    cart.splice(Math.min(position, cart.length), 0, removed);
+                    saveCart();
+                    renderCart();
+                    updateCount();
+                }
+            });
+            return;
+        }
+
+        saveCart();
+        renderCart();
+        updateCount();
+    });
+
+    $('#cart-open-btn').on('click', openCart);
+    $('#close-cart-btn, #continue-shopping-btn').on('click', function () {
+        closeCart();
+    });
+    $('#cart-backdrop').on('click', function () {
+        closeCart();
+    });
+
+    $('#clear-cart-btn').on('click', function () {
+        if (!cart.length) return;
+
+        const snapshot = cart.slice();
+        cart = [];
+
+        saveCart();
+        renderCart();
+        updateCount();
+
+        showToast('Cart cleared', {
+            icon: '×',
+            actionLabel: 'Undo',
+            onAction: function () {
+                cart = snapshot;
+                saveCart();
+                renderCart();
+                updateCount();
+            }
+        });
+    });
+
+    /* ------------------------------------------------------------------
+       Add to cart
+    ------------------------------------------------------------------ */
 
     $('.add-cart').on('click', function () {
         const $button = $(this);
 
         if ($button.is(':disabled') || $button.attr('data-available') === 'false') {
-            alert($button.data('name') + ' is currently unavailable.');
+            showToast($button.data('name') + ' is currently unavailable.', { icon: '!', tone: 'warning' });
             return;
         }
 
         const id = Number($button.data('id'));
         const name = String($button.data('name'));
+        const image = String($button.data('image') || '');
         const price = Number($button.data('price'));
         const $quantityInput = $button.closest('.product-card').find('.menu-quantity-input');
         const rawQuantity = Number($quantityInput.val());
@@ -180,188 +460,442 @@ $(function () {
         if (
             !Number.isSafeInteger(id) || id < 1 ||
             !Number.isFinite(price) || price < 0 ||
-            !Number.isInteger(rawQuantity) || rawQuantity < 1 || rawQuantity > 50
+            !Number.isInteger(rawQuantity) || rawQuantity < 1 || rawQuantity > MAX_QTY
         ) {
-            alert('Enter a whole-number quantity from 1 to 50.');
+            showToast('Enter a whole-number quantity from 1 to 50.', { icon: '!', tone: 'warning' });
             $quantityInput.trigger('focus');
             return;
         }
 
-        if (cart.length >= 50 && !cart.some(item => Number(item.id) === id)) {
-            alert('Your cart can contain up to 50 different products.');
+        if (cart.length >= MAX_LINES && !cart.some(item => item.id === id)) {
+            showToast('Your cart can contain up to 50 different products.', { icon: '!', tone: 'warning' });
             return;
         }
 
         const quantity = rawQuantity;
-        const found = cart.find(item => Number(item.id) === id);
+        const found = cart.find(item => item.id === id);
+        const stockRaw = $button.attr('data-stock');
+        const stock = stockRaw === undefined || stockRaw === '' ? null : Number(stockRaw);
+
+        if (stock !== null) {
+            if (!Number.isInteger(stock) || stock < 1) {
+                showToast(name + ' is sold out.', { icon: '!', tone: 'warning' });
+                return;
+            }
+
+            const inCart = found ? found.quantity : 0;
+
+            if (quantity > stock) {
+                $quantityInput.val(stock);
+                showToast('Only ' + stock + ' left of ' + name + '.', { icon: '!', tone: 'warning' });
+                return;
+            }
+
+            if (inCart + quantity > stock) {
+                showToast('Only ' + stock + ' left of ' + name + ' and you already have ' + inCart + ' in your cart.', { icon: '!', tone: 'warning' });
+                return;
+            }
+        }
 
         if (found) {
-            if (found.quantity + quantity > 50) {
-                alert('A maximum of 50 units is allowed per product.');
+            if (found.quantity + quantity > MAX_QTY) {
+                showToast('A maximum of 50 units is allowed per product.', { icon: '!', tone: 'warning' });
                 return;
             }
             found.quantity += quantity;
         } else {
-            cart.push({ id, name, price, quantity });
+            cart.push({
+                id: id,
+                name: name,
+                price: price,
+                quantity: quantity,
+                image: image
+            });
         }
 
         $quantityInput.val(1);
         saveCart();
-        updateCount();
+        updateCount(true);
 
-        alert(quantity + ' × ' + name + ' added to cart!');
+        if ($drawer.hasClass('show')) renderCart();
+
+        showToast(quantity + ' × ' + name + ' added to cart', {
+            icon: '🛒',
+            actionLabel: 'View cart',
+            onAction: openCart
+        });
     });
 
-    $('#cart-open-btn').on('click', function () {
-        renderCart();
-        $('#cart-modal').stop(true, true).fadeIn(150);
-    });
-
-    $('#close-cart-btn').on('click', function () {
-        $('#cart-modal').fadeOut(150);
-    });
+    /* ------------------------------------------------------------------
+       Checkout
+    ------------------------------------------------------------------ */
 
     function totalsNow() {
         const subCents = subtotalCents();
-        const discountCents = $('#senior-pwd').is(':checked')
-            ? Math.round(subCents * 0.20)
-            : 0;
-        const totalCents = subCents - discountCents;
+        const discountCents = $('#senior-pwd').is(':checked') ? Math.round(subCents * 0.2) : 0;
 
         return {
             sub: subCents / 100,
             discount: discountCents / 100,
-            total: totalCents / 100
+            total: (subCents - discountCents) / 100
         };
     }
 
-    function renderReceiptItems() {
+    function renderCheckout() {
         const $items = $('#receipt-items').empty();
 
         cart.forEach(function (item) {
-            const $row = $('<div class="d-flex justify-content-between gap-3 mb-2"></div>');
-
-            $('<span></span>')
-                .text(item.name + ' × ' + item.quantity)
-                .appendTo($row);
-
-            $('<span></span>')
-                .text(peso(item.price * item.quantity))
-                .appendTo($row);
-
+            const $row = $('<div class="checkout-item"></div>');
+            $('<span class="checkout-item-qty"></span>').text(item.quantity + '×').appendTo($row);
+            $('<span class="checkout-item-name"></span>').text(item.name).appendTo($row);
+            $('<span class="checkout-item-total"></span>').text(peso(item.price * item.quantity)).appendTo($row);
             $items.append($row);
         });
 
-        updateReceiptTotal();
+        refreshCheckoutTotals();
     }
 
-    function updateReceiptTotal() {
+    function confirmLabel() {
+        return paymentMethod === 'Cash' ? 'Confirm payment' : 'Place order';
+    }
+
+    function refreshCheckoutTotals() {
         const totals = totalsNow();
-        $('#receipt-total').text('Total: ' + peso(totals.total));
-        return totals;
+
+        $('#receipt-subtotal').text(peso(totals.sub));
+        $('#receipt-total').text(peso(totals.total));
+        $('#receipt-discount-row').toggleClass('d-none', totals.discount <= 0);
+        $('#receipt-discount').text('−' + peso(totals.discount));
+        $('#qr-amount').text(peso(totals.total));
+
+        updateCashFeedback();
     }
 
-    $('#checkout-btn').on('click', function () {
-        if (!cartIsValid()) {
-            alert(cart.length ? 'Your cart has invalid items or quantities. Remove them and try again.' : 'Your cart is empty!');
+    function updateCashFeedback() {
+        const totalCents = toCents(totalsNow().total);
+        const raw = String($('#cash-amount').val() || '').trim();
+        const cashCents = inputAmountCents(raw);
+        const $feedback = $('#cash-feedback').removeClass('is-ok is-short is-hint');
+
+        if (raw === '') {
+            $feedback.addClass('is-hint').text('Enter the cash handed over to compute change.');
+        } else if (cashCents === null) {
+            $feedback.addClass('is-short').text('Enter a valid amount with up to two decimal places.');
+        } else if (cashCents < totalCents) {
+            $feedback.addClass('is-short').text('Short by ' + peso((totalCents - cashCents) / 100) + '.');
+        } else {
+            $feedback.addClass('is-ok').text('Change due: ' + peso((cashCents - totalCents) / 100));
+        }
+
+        updateConfirmState();
+    }
+
+    function cashIsEnough() {
+        const cashCents = inputAmountCents($('#cash-amount').val());
+        return cashCents !== null && cashCents >= toCents(totalsNow().total);
+    }
+
+    function paymentIsReady() {
+        return paymentMethod === 'Cash' ? cashIsEnough() : $('#qr-confirm').is(':checked');
+    }
+
+    function updateConfirmState() {
+        const $confirm = $('#confirm-payment-btn');
+        if ($confirm.data('busy')) return;
+        $confirm.prop('disabled', !cart.length || !paymentIsReady());
+    }
+
+    function selectPaymentMethod(method) {
+        if (!paymentMethods[method]) return;
+
+        paymentMethod = method;
+        const config = paymentMethods[method];
+
+        $('.payment-method').removeClass('is-active').filter(function () {
+            return $(this).find('input[name="payment-method"]').val() === method;
+        }).addClass('is-active');
+
+        if (method === 'Cash') {
+            $('#cash-panel').removeClass('d-none');
+            $('#qr-panel, #qr-note, #qr-confirm-row, #proof-upload').addClass('d-none');
+            resetProof();
+        } else {
+            $('#cash-panel').addClass('d-none');
+            $('#qr-panel, #qr-note, #qr-confirm-row, #proof-upload').removeClass('d-none');
+
+            $('#qr-image').attr('src', config.image).attr('alt', config.alt);
+            $('#qr-method-name').text(config.label);
+            $('#qr-account').text(config.account).toggleClass('d-none', !config.account);
+        }
+
+        $('#checkout-error').addClass('d-none').text('');
+        $('#confirm-payment-btn').text(confirmLabel());
+
+        refreshCheckoutTotals();
+    }
+
+    function showCheckoutError(message) {
+        $('#checkout-error').removeClass('d-none').text(message);
+    }
+
+    function hideCheckoutError() {
+        $('#checkout-error').addClass('d-none').text('');
+    }
+
+    function resetProofPreview() {
+        $('#proof-preview').addClass('d-none').empty();
+
+        if (proofPreviewUrl) {
+            URL.revokeObjectURL(proofPreviewUrl);
+            proofPreviewUrl = null;
+        }
+    }
+
+    function resetProof() {
+        $('#payment-proof').val('');
+        resetProofPreview();
+    }
+
+    function selectedProofFile() {
+        const input = document.getElementById('payment-proof');
+        return input && input.files && input.files[0] ? input.files[0] : null;
+    }
+
+    function openCheckout() {
+        if (!cart.length) {
+            showToast('Your cart is empty.', { icon: '!', tone: 'warning' });
             return;
         }
 
-        renderReceiptItems();
+        if (!signedIn) {
+            window.location.href = 'customer/login.php';
+            return;
+        }
+
+        renderCheckout();
+        $('#senior-pwd').prop('checked', false).trigger('change');
         $('#cash-amount').val('');
-        $('#change-display').text('');
-        $('#cart-modal').fadeOut(100);
-        $('#receipt-modal').fadeIn(150);
+        $('#pickup-at').val('');
+        $('#qr-confirm').prop('checked', false);
+        resetProof();
+        hideCheckoutError();
+
+        closeCart({ restoreFocus: false });
+        $checkout.addClass('is-open').attr('aria-hidden', 'false');
+        syncScrollLock();
+
+        selectPaymentMethod('Cash');
+
+        window.setTimeout(function () {
+            document.getElementById('cash-amount')?.focus();
+        }, 180);
+    }
+
+    function closeCheckout() {
+        $checkout.removeClass('is-open').attr('aria-hidden', 'true');
+        hideCheckoutError();
+        syncScrollLock();
+    }
+
+    function closeConfirmation() {
+        $confirmation.removeClass('is-open').attr('aria-hidden', 'true');
+        syncScrollLock();
+    }
+
+    $('#checkout-btn').on('click', openCheckout);
+
+    $('#cancel-receipt-btn').on('click', closeCheckout);
+
+    $('#back-to-cart-btn').on('click', function () {
+        closeCheckout();
+        openCart();
     });
 
-    $('#senior-pwd').on('change', updateReceiptTotal);
+    let discountPreviewUrl = null;
+    function resetDiscountProof() {
+        $('#discount-proof').val('');
+        $('#discount-proof-preview').addClass('d-none').removeAttr('src');
+        if (discountPreviewUrl) URL.revokeObjectURL(discountPreviewUrl);
+        discountPreviewUrl = null;
+    }
+    $('#senior-pwd').on('change', function () {
+        const enabled = $(this).is(':checked');
+        $('#discount-proof-upload').toggleClass('d-none', !enabled);
+        $('#discount-proof').prop('required', enabled);
+        if (!enabled) resetDiscountProof();
+        refreshCheckoutTotals();
+    });
+    $('#discount-proof').on('change', function () {
+        const file = this.files[0];
+        $('#discount-proof-preview').addClass('d-none').removeAttr('src');
+        if (discountPreviewUrl) URL.revokeObjectURL(discountPreviewUrl);
+        discountPreviewUrl = null;
+        if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+            $(this).val('');
+            showCheckoutError('Upload a JPG, PNG, or WebP ID photo, 5 MB or smaller.');
+            return;
+        }
+        hideCheckoutError();
+        discountPreviewUrl = URL.createObjectURL(file);
+        $('#discount-proof-preview').attr('src', discountPreviewUrl).removeClass('d-none');
+    });
+    $('#cash-amount').on('input', updateCashFeedback);
 
-    $('#cash-amount').on('input', function () {
-        const value = $(this).val();
-        const cashCents = inputAmountCents(value);
-        const total = totalsNow().total;
+    $('.payment-methods').on('change', 'input[name="payment-method"]', function () {
+        selectPaymentMethod(String($(this).val()));
+    });
 
-        $('#change-display').text(
-            value !== '' && cashCents !== null && cashCents >= Math.round(total * 100)
-                ? 'Change: ' + peso((cashCents - Math.round(total * 100)) / 100)
-                : ''
-        );
+    $('#qr-confirm').on('change', updateConfirmState);
+
+    $('#payment-proof').on('change', function () {
+        resetProofPreview();
+
+        const file = selectedProofFile();
+        if (!file) return;
+
+        if (!PROOF_TYPES.includes(file.type)) {
+            $(this).val('');
+            showCheckoutError('Proof of payment must be a JPG, PNG, or WebP image.');
+            return;
+        }
+
+        if (file.size > MAX_PROOF_BYTES) {
+            $(this).val('');
+            showCheckoutError('Proof of payment must be 5 MB or smaller.');
+            return;
+        }
+
+        hideCheckoutError();
+
+        proofPreviewUrl = URL.createObjectURL(file);
+
+        $('#proof-preview')
+            .removeClass('d-none')
+            .append($('<img alt="Selected proof of payment">').attr('src', proofPreviewUrl))
+            .append($('<span class="proof-preview-name"></span>').text(file.name));
+    });
+
+    $('.cash-quick').on('click', 'button', function () {
+        const value = String($(this).attr('data-cash'));
+
+        $('#cash-amount').val(value === 'exact' ? totalsNow().total.toFixed(2) : Number(value).toFixed(2));
+        updateCashFeedback();
     });
 
     $('#confirm-payment-btn').on('click', function () {
         const $button = $(this);
+        if ($button.data('busy')) return;
 
-        if ($button.prop('disabled')) return;
+        const totals = totalsNow();
+        const totalCents = toCents(totals.total);
+        const cashCents = inputAmountCents($('#cash-amount').val());
+        const method = paymentMethods[paymentMethod];
+        let cash;
 
-        if (!cartIsValid()) {
-            alert(cart.length ? 'Your cart has invalid items or quantities. Review your cart and try again.' : 'Your cart is empty!');
+        if (!cart.length) {
+            showCheckoutError('Your cart is empty. Add a product and try again.');
             return;
         }
 
-        const totals = updateReceiptTotal();
-        const rawCash = $('#cash-amount').val();
-        const cashCents = inputAmountCents(rawCash);
+        if (paymentMethod === 'Cash') {
+            if (cashCents === null || cashCents < 1) {
+                showCheckoutError('Enter a valid cash amount with up to two decimal places.');
+                $('#cash-amount').trigger('focus');
+                return;
+            }
 
-        if (cashCents === null || cashCents < 1) {
-            alert('Enter a valid cash amount with no more than two decimal places.');
-            return;
+            if (cashCents < totalCents) {
+                showCheckoutError('Insufficient cash. Enter an amount equal to or greater than the total.');
+                $('#cash-amount').trigger('focus');
+                return;
+            }
+
+            cash = cashCents / 100;
+        } else {
+            if (!$('#qr-confirm').is(':checked')) {
+                showCheckoutError('Please confirm that you have sent the ' + method.label + ' payment.');
+                return;
+            }
+
+            cash = totals.total;
         }
 
-        if (cashCents < Math.round(totals.total * 100)) {
-            alert('Insufficient cash. Please enter an amount equal to or greater than the total.');
+        const change = paymentMethod === 'Cash' ? (cashCents - totalCents) / 100 : 0;
+
+        hideCheckoutError();
+        $button.data('busy', true).prop('disabled', true)
+            .html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing…');
+
+        if (paymentMethod !== 'Cash' && !selectedProofFile()) {
+            showCheckoutError('Upload a payment receipt for staff review.');
+            $button.data('busy', false).prop('disabled', false).html(confirmLabel());
             return;
         }
+        const discountFile = document.getElementById('discount-proof').files[0];
+        if ($('#senior-pwd').is(':checked') && !discountFile) {
+            showCheckoutError('Upload your Senior or PWD ID photo to use the discount.');
+            $button.data('busy', false).prop('disabled', false).html(confirmLabel());
+            return;
+        }
+        const formData = new FormData();
+        if ($('#senior-pwd').is(':checked') && discountFile) formData.append('discount_proof', discountFile);
+        formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
 
-        const cash = cashCents / 100;
-        const change = (cashCents - Math.round(totals.total * 100)) / 100;
+        formData.append('payload', JSON.stringify({
+            items: cart.map(item => ({
+                id: Number(item.id),
+                quantity: item.quantity
+            })),
+            subtotal: totals.sub,
+            discount: totals.discount,
+            total: totals.total,
+            cash_received: cash,
+            payment_method: paymentMethod,
+            pickup_at: document.getElementById('pickup-at').value
+        }));
 
-        $button.prop('disabled', true).text('Processing...');
+        const proofFile = paymentMethod === 'Cash' ? null : selectedProofFile();
+        if (proofFile) formData.append('payment_proof', proofFile);
 
         $.ajax({
             url: 'orders/create.php',
             method: 'POST',
-            contentType: 'application/json; charset=utf-8',
             dataType: 'json',
-            data: JSON.stringify({
-                items: cart.map(item => ({
-                    id: Number(item.id),
-                    quantity: item.quantity
-                })),
-                subtotal: totals.sub,
-                discount: totals.discount,
-                total: totals.total,
-                cash_received: cash
-            })
+            processData: false,
+            contentType: false,
+            data: formData
         })
         .done(function (savedOrder) {
             if (!savedOrder || !savedOrder.ok || !savedOrder.order_id) {
-                alert(savedOrder?.message || 'The order could not be completed.');
+                showCheckoutError(savedOrder && savedOrder.message ? savedOrder.message : 'The order could not be completed.');
                 return;
             }
 
-            completeOrder(savedOrder.order_id, totals, cash, change);
+            completeOrder(savedOrder.order_id, totals, cash, change, paymentMethod);
         })
         .fail(function (xhr) {
-            let message = 'Could not place your order. Please try again.';
-
-            if (xhr.responseJSON?.message) {
-                message = xhr.responseJSON.message;
-            }
-
             if (xhr.status === 401) {
-                alert('Please sign in before placing an order. Your cart will remain saved.');
-                window.location.href = 'customer/login.php';
+                showCheckoutError('Please sign in before placing an order. Your cart is saved.');
+                window.setTimeout(function () {
+                    window.location.href = 'customer/login.php';
+                }, 1200);
                 return;
             }
 
-            alert(message);
+            const message = (xhr.responseJSON && xhr.responseJSON.message)
+                ? xhr.responseJSON.message
+                : 'Could not place your order. Please try again.';
+
+            showCheckoutError(message);
         })
         .always(function () {
-            $button.prop('disabled', false).text('Confirm Payment');
+            $button.data('busy', false).html(confirmLabel());
+            updateConfirmState();
         });
     });
 
-    function completeOrder(orderId, totals, cash, change) {
+    function completeOrder(orderId, totals, cash, change, method) {
         const $summary = $('#confirmation-body').empty();
         const $receipt = $('<section class="receipt-preview"></section>');
         const $watermark = $('<img class="receipt-watermark" alt="" aria-hidden="true">')
@@ -414,8 +948,14 @@ $(function () {
             appendTotal('Senior / PWD discount', '−' + peso(totals.discount), 'receipt-discount');
         }
         appendTotal('Total', peso(totals.total), 'receipt-grand-total');
-        appendTotal('Cash received', peso(cash));
-        appendTotal('Change', peso(change));
+
+        if (method === 'Cash') {
+            appendTotal('Cash received', peso(cash));
+            appendTotal('Change', peso(change));
+        } else {
+            appendTotal('Payment method', method);
+            appendTotal('Amount paid', peso(totals.total));
+        }
 
         $content.append($brand, $meta, $items, $totals);
         $('<p class="receipt-thanks"></p>')
@@ -426,35 +966,67 @@ $(function () {
             .appendTo($content);
         $receipt.append($watermark, $content);
 
-        $('<p class="text-success small text-center fw-semibold mb-3"></p>')
-            .text('Your order has been saved to your account.')
-            .appendTo($summary);
         $summary.append($receipt);
+        $('#confirmation-message').text(
+            method === 'Cash'
+                ? 'Order #' + orderId + ' has been saved to your account. Please pay at the counter.'
+                : 'Order #' + orderId + ' has been saved · payment received via ' + method + '.'
+        );
 
         cart = [];
         saveCart();
         updateCount();
 
-        $('#receipt-modal').fadeOut(100);
+        $('#checkout-modal').removeClass('is-open').attr('aria-hidden', 'true');
         $('#cash-amount').val('');
-        $('#senior-pwd').prop('checked', false);
-        $('#change-display').empty();
-        $('#confirmation-modal').fadeIn(150);
-        window.setTimeout(function () {
-            window.print();
-        }, 500);
+        $('#pickup-at').val('');
+        $('#senior-pwd').prop('checked', false).trigger('change');
+        $('#qr-confirm').prop('checked', false);
+        resetProof();
+        $('#cash-feedback').removeClass('is-ok is-short').addClass('is-hint')
+            .text('Enter the cash handed over to compute change.');
+        hideCheckoutError();
+
+        $confirmation.addClass('is-open').attr('aria-hidden', 'false');
+        syncScrollLock();
+
+        document.getElementById('confirmation-body')?.scrollIntoView({ block: 'nearest' });
+
+        showToast('Order #' + orderId + ' placed successfully.', { icon: '✓' });
     }
 
-    $('#cancel-receipt-btn').on('click', function () {
-        $('#receipt-modal').fadeOut(150);
-    });
-
-    $('#close-confirmation-btn').on('click', function () {
-        $('#confirmation-modal').fadeOut(150);
-    });
+    $('#close-confirmation-btn').on('click', closeConfirmation);
 
     $('#print-receipt-btn').on('click', function () {
         window.print();
+    });
+
+    /* ------------------------------------------------------------------
+       Overlay behaviours
+    ------------------------------------------------------------------ */
+
+    $checkout.on('mousedown', function (event) {
+        if (event.target === this) {
+            closeCheckout();
+            openCart();
+        }
+    });
+
+    $confirmation.on('mousedown', function (event) {
+        if (event.target === this) closeConfirmation();
+    });
+
+    $(document).on('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+
+        if ($confirmation.hasClass('is-open')) {
+            closeConfirmation();
+        } else if ($checkout.hasClass('is-open')) {
+            closeCheckout();
+            openCart();
+        } else if ($drawer.hasClass('show')) {
+            closeCart();
+        }
     });
 
     window.addEventListener('beforeprint', function () {
@@ -473,12 +1045,6 @@ $(function () {
     window.addEventListener('afterprint', function () {
         const receipt = document.querySelector('.receipt-preview');
         if (receipt) receipt.style.zoom = '';
-    });
-
-    $('.cart-modal').on('click', function (event) {
-        if (event.target === this) {
-            $(this).fadeOut(150);
-        }
     });
 
     updateCount();

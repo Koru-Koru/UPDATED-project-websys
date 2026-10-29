@@ -5,10 +5,20 @@ require_once __DIR__ . '/../includes/functions.php';
 require_admin();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $action = $_POST['action'] ?? '';
     $id = (int) ($_POST['customer_id'] ?? 0);
 
     if ($action === 'delete' && $id > 0) {
+        // Preserve order history: the customer foreign key uses ON DELETE CASCADE.
+        $check = $conn->prepare('SELECT order_id FROM orders WHERE customer_id = ? LIMIT 1');
+        $check->bind_param('i', $id);
+        $check->execute();
+        if ($check->get_result()->fetch_assoc()) {
+            set_flash('Customers with order history cannot be deleted.', 'danger');
+            header('Location: customers.php');
+            exit;
+        }
         $stmt = $conn->prepare(
             'DELETE FROM customers WHERE customer_id = ?'
         );
@@ -106,7 +116,7 @@ $customers = $conn
     <title>Customer Maintenance | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 <body class="admin-page">
 
@@ -145,11 +155,18 @@ $customers = $conn
 
     <?php show_flash(); ?>
 
-    <section class="card admin-card shadow-sm mb-4">
+    <section class="card admin-card shadow-sm mb-4" id="customer-form">
         <div class="card-body p-4">
             <h2 class="h5 mb-3">
-                <?= $editCustomer ? 'Edit Customer' : 'Add Customer' ?>
+                <?= $editCustomer ? 'Edit Customer #' . (int) $editCustomer['customer_id'] : 'Add Customer' ?>
             </h2>
+
+            <?php if ($editCustomer): ?>
+                <p class="text-secondary small mb-3">
+                    Change the details below, then choose Save Changes.
+                    <a href="customers.php">Add a new customer instead</a>.
+                </p>
+            <?php endif; ?>
 
             <?php if (isset($_GET['edit']) && !$editCustomer): ?>
                 <div class="alert alert-warning">
@@ -157,7 +174,8 @@ $customers = $conn
                 </div>
             <?php endif; ?>
 
-            <form method="post" class="row g-3">
+            <form method="post" action="customers.php" class="row g-3">
+                <?= csrf_field() ?>
                 <input
                     type="hidden"
                     name="action"
@@ -181,6 +199,7 @@ $customers = $conn
                         class="form-control"
                         maxlength="120"
                         value="<?= h($editCustomer['full_name'] ?? '') ?>"
+                        <?= $editCustomer ? 'autofocus' : '' ?>
                         required
                     >
                 </div>
@@ -259,8 +278,9 @@ $customers = $conn
                                 <td>
                                     <div class="d-flex flex-wrap gap-2">
                                         <a
-                                            href="customers.php?edit=<?= (int) $customer['customer_id'] ?>"
+                                            href="customers.php?edit=<?= (int) $customer['customer_id'] ?>#customer-form"
                                             class="btn btn-sm btn-outline-primary"
+                                            aria-label="Edit customer <?= h($customer['full_name']) ?>"
                                         >
                                             Edit
                                         </a>
@@ -269,6 +289,7 @@ $customers = $conn
                                             method="post"
                                             onsubmit="return confirm('Delete this customer account?');"
                                         >
+                                            <?= csrf_field() ?>
                                             <input
                                                 type="hidden"
                                                 name="action"

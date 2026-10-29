@@ -1,0 +1,9 @@
+# Keep customer uploads out of source control.
+*
+!.gitignore
+!payment_proofs/
+payment_proofs/*
+!payment_proofs/.gitkeep
+!discount_proofs/
+discount_proofs/*
+!discount_proofs/.htaccess

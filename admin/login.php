@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -8,24 +7,53 @@ if (!empty($_SESSION['admin_id'])) {
     exit;
 }
 
+// New installations need an administrator before password login is possible.
+if ($conn->query('SELECT admin_id FROM admins LIMIT 1')->num_rows === 0) {
+    header('Location: ../setup_admin.php');
+    exit;
+}
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    // Hardcoded admin credentials
-    if ($username === 'phbestcoffeeadmin' && $password === '12345678') {
-        session_regenerate_id(true);
+    if ($username === '' || $password === '') {
+        $error = 'Enter your username and password.';
+    } else {
+        try {
+            $stmt = $conn->prepare(
+                'SELECT admin_id, username, password_hash
+                 FROM admins
+                 WHERE username = ?
+                 LIMIT 1'
+            );
+            $stmt->bind_param('s', $username);
+            $stmt->execute();
 
-        $_SESSION['admin_id'] = 1;
-        $_SESSION['admin_username'] = 'phbestcoffeeadmin';
+            $admin = $stmt->get_result()->fetch_assoc();
 
-        header('Location: dashboard.php');
-        exit;
+            if (
+                $admin &&
+                !empty($admin['password_hash']) &&
+                password_verify($password, $admin['password_hash'])
+            ) {
+                session_regenerate_id(true);
+
+                $_SESSION['admin_id'] = (int) $admin['admin_id'];
+                $_SESSION['admin_username'] = $admin['username'];
+
+                header('Location: dashboard.php');
+                exit;
+            }
+        } catch (mysqli_sql_exception $e) {
+            error_log('Admin login error: ' . $e->getMessage());
+        }
+
+        $error = 'Invalid username or password.';
     }
-
-    $error = 'Invalid username or password.';
 }
 ?>
 
@@ -38,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="auth-page">
@@ -67,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post">
+            <?= csrf_field() ?>
             <div class="mb-3">
                 <label class="form-label" for="username">Username</label>
                 <input

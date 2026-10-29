@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -51,7 +50,7 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <title>Order #<?= (int) $order['order_id'] ?> | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="admin-page">
@@ -86,6 +85,9 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 <div class="card admin-card shadow-sm h-100">
                     <div class="card-body p-4">
                         <h2 class="h5 mb-3">Customer Information</h2>
+                        <p><strong>Pickup:</strong> <?= h($order['pickup_at'] ?: 'As soon as ready') ?></p>
+                        <p>Payment: <?= h($order['payment_review']) ?><br>ID: <?= h($order['id_review']) ?></p>
+                        <a class="btn btn-outline-coffee mb-3" href="review_order.php?id=<?= (int)$order['order_id'] ?>">Review documents</a>
 
                         <p class="mb-2">
                             <strong>Name:</strong><br>
@@ -150,14 +152,50 @@ $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
                         <div class="ms-auto" style="max-width:320px;">
                             <?php
+                            $paymentMethod = $order['payment_method'] ?? 'Cash';
+
                             $totals = [
                                 'Subtotal' => 'subtotal',
                                 'Discount' => 'discount',
-                                'Total' => 'total',
-                                'Cash Received' => 'cash_received',
-                                'Change' => 'change_amount'
+                                'Total' => 'total'
                             ];
+
+                            if ($paymentMethod === 'Cash') {
+                                $totals['Cash Received'] = 'cash_received';
+                                $totals['Change'] = 'change_amount';
+                            }
                             ?>
+
+                            <div class="d-flex justify-content-between gap-3 mb-2">
+                                <span>Payment Method</span>
+                                <strong><?= h($paymentMethod) ?></strong>
+                            </div>
+
+                            <?php if ((float) $order['discount'] > 0): ?>
+                                <div class="mb-3">
+                                    <span class="d-block fw-semibold">Senior / PWD ID proof</span>
+                                    <a href="discount_proof.php?id=<?= (int) $order['order_id'] ?>" target="_blank" rel="noopener">Review uploaded ID photo</a>
+                                    <p class="small text-secondary mb-0">Confirm eligibility before fulfilling the discounted order. Older orders may have no ID photo.</p>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($order['payment_proof'])): ?>
+                                <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+                                    <span>Proof of payment</span>
+                                    <a
+                                        href="../<?= h($order['payment_proof']) ?>"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="d-inline-flex align-items-center gap-2 text-decoration-none"
+                                    >
+                                        <img
+                                            src="../<?= h($order['payment_proof']) ?>"
+                                            alt="Proof of payment for order <?= (int) $order['order_id'] ?>"
+                                            style="width:48px;height:48px;object-fit:cover;border-radius:.4rem;border:1px solid #ddd;"
+                                        >
+                                        <span class="small">View</span>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
 
                             <?php foreach ($totals as $label => $key): ?>
                                 <div class="d-flex justify-content-between gap-3 mb-2">

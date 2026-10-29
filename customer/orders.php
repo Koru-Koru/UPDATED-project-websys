@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
 
@@ -30,7 +29,7 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
         rel="stylesheet"
     >
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="account-body">

@@ -42,8 +42,7 @@ if ($startDate > $endDate) {
 $startSql = $conn->real_escape_string($startDate);
 $endSql = $conn->real_escape_string($endDate);
 
-$dateCondition = "DATE(o.created_at) BETWEEN '$startSql' AND '$endSql'";
-$validOrders = "$dateCondition AND o.status <> 'Cancelled'";
+$validOrders = "DATE(o.created_at) BETWEEN '$startSql' AND '$endSql' AND o.status <> 'Cancelled'";
 
 $summary = fetch_one(
     $conn,
@@ -153,7 +152,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
     <title>Business Analytics | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -233,6 +232,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
 
             <div class="col-sm-2 col-md-4 d-flex gap-2">
                 <button class="btn btn-coffee" type="submit">View Report</button>
+                <button class="btn btn-outline-coffee" type="submit" formaction="export_sales.php">Export CSV</button>
                 <a href="analytics.php" class="btn btn-outline-secondary">Reset</a>
             </div>
         </div>

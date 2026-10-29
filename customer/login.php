@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
 
@@ -10,6 +9,7 @@ if (!empty($_SESSION['customer_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $email = strtolower(trim($_POST['email'] ?? ''));
     $password = $_POST['password'] ?? '';
 
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-            $error = 'Email or password is incorrect. If the administrator already added your email, use Create an account to set your password.';
+            $error = 'Email or password is incorrect. Contact the shop if you need help accessing an existing account.';
         } catch (mysqli_sql_exception $e) {
             error_log('Customer login error: ' . $e->getMessage());
             $error = 'Unable to sign in right now. Please try again later.';
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Customer Login | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="account-body">
@@ -97,7 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
+            <p><a href="forgot_password.php">Forgot your password?</a></p>
             <form method="post" action="">
+                <?= csrf_field() ?>
                 <div class="mb-3">
                     <label for="email" class="form-label">Email</label>
                     <input

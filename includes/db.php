@@ -9,6 +9,7 @@ $password = ''; // Default XAMPP MySQL password is usually blank.
 try {
     $conn = new mysqli($host, $username, $password, $dbname);
     $conn->set_charset('utf8mb4');
+    $conn->query("SET time_zone = '+08:00'");
 } catch (mysqli_sql_exception $e) {
     http_response_code(500);
     exit('Database connection failed. Check XAMPP MySQL and the settings in includes/db.php.');

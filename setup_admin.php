@@ -1,11 +1,18 @@
 <?php
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/functions.php';
+
+if ($conn->query('SELECT admin_id FROM admins LIMIT 1')->num_rows > 0) {
+    header('Location: admin/login.php');
+    exit;
+}
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
-    if ($username === '' || strlen($password) < 8) {
+    if ($username === '' || strlen($username) > 80 || strlen($password) < 8) {
         $message = 'Enter a username and a password with at least 8 characters.';
     } else {
         $check = $conn->prepare('SELECT admin_id FROM admins WHERE username = ?');
@@ -18,7 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare('INSERT INTO admins (username, password_hash) VALUES (?, ?)');
             $stmt->bind_param('ss', $username, $hash);
             $stmt->execute();
-            $message = 'Admin account created. For security, delete setup_admin.php now, then sign in.';
+            session_regenerate_id(true);
+            $_SESSION['admin_id'] = (int) $stmt->insert_id;
+            $_SESSION['admin_username'] = $username;
+            header('Location: admin/dashboard.php');
+            exit;
         }
     }
 }
@@ -31,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Set Up Admin | Philippines' Best Coffee</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/phbestcoffee.css">
+    <link rel="stylesheet" href="assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/assets/phbestcoffee.css') ?>">
 </head>
 <body class="bg-light">
 
@@ -50,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <form method="post">
+                <?= csrf_field() ?>
                 <div class="mb-3">
                     <label for="username" class="form-label">Admin Username</label>
                     <input
@@ -93,4 +105,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </body>
 </html>
-

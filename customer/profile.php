@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/customer_auth.php';
 
@@ -46,6 +45,22 @@ $stmt->bind_param('i', $id);
 $stmt->execute();
 
 $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+$stmt = $conn->prepare(
+    'SELECT oi.product_name,
+            SUM(oi.quantity) AS total_quantity,
+            SUM(oi.line_total) AS total_spent
+     FROM order_items oi
+     JOIN orders o ON o.order_id = oi.order_id
+     WHERE o.customer_id = ? AND o.status <> \'Cancelled\'
+     GROUP BY oi.product_name
+     ORDER BY total_quantity DESC, total_spent DESC, oi.product_name ASC
+     LIMIT 3'
+);
+$stmt->bind_param('i', $id);
+$stmt->execute();
+
+$favorites = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 ?>
 <!doctype html>
 <html lang="en">
@@ -59,7 +74,7 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
         rel="stylesheet"
     >
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 
 <body class="account-body">
@@ -146,6 +161,51 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         </div>
 
     </div>
+
+    <section class="card account-card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h2 class="h5 mb-1">Your Top 3 Favorites</h2>
+                    <p class="text-secondary small mb-0">
+                        The items you order most often.
+                    </p>
+                </div>
+
+                <a href="orders.php" class="btn btn-outline-coffee btn-sm">
+                    Order History
+                </a>
+            </div>
+
+            <?php if (empty($favorites)): ?>
+                <p class="text-secondary mb-0">
+                    You don't have any active orders yet. Once you place a few
+                    orders, the items you buy most will appear here.
+                </p>
+            <?php else: ?>
+                <div class="favorites-grid">
+                    <?php foreach ($favorites as $index => $favorite): ?>
+                        <article class="favorite-item">
+                            <span class="favorite-rank" aria-hidden="true">
+                                <?= $index + 1 ?>
+                            </span>
+
+                            <div class="favorite-info">
+                                <h3 class="favorite-name">
+                                    <?= h($favorite['product_name']) ?>
+                                </h3>
+                                <p class="favorite-meta mb-0">
+                                    <?= (int) $favorite['total_quantity'] ?> ordered
+                                    <span class="favorite-dot" aria-hidden="true">·</span>
+                                    ₱<?= number_format((float) $favorite['total_spent'], 2) ?> spent
+                                </p>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </section>
 
     <div class="row g-4">
 

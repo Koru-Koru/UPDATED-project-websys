@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -21,7 +20,7 @@ $customerCount = (int) $conn
     <title>Admin Dashboard | Philippines' Best Coffee</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/phbestcoffee.css">
+    <link rel="stylesheet" href="../assets/phbestcoffee.css?v=<?= filemtime(__DIR__ . '/../assets/phbestcoffee.css') ?>">
 </head>
 <body class="admin-page">
 
@@ -46,6 +45,30 @@ $customerCount = (int) $conn
 
 <main class="container py-4">
     <h1 class="h2 mb-4">Admin Dashboard</h1>
+    <div class="dashboard-shortcuts d-flex flex-wrap gap-2 mb-4">
+        <a href="settings.php" class="btn btn-outline-coffee">Password settings</a>
+        <a href="recovery.php" class="btn btn-outline-coffee">Customer recovery requests</a>
+        <a href="analytics.php" class="btn btn-outline-coffee">Reports and CSV export</a>
+    </div>
+    <?php
+    $lowStock = $conn->query('SELECT product_id, name, stock FROM products WHERE stock IS NOT NULL AND stock <= 10 ORDER BY stock, name')->fetch_all(MYSQLI_ASSOC);
+    ?>
+    <section class="stock-panel mb-4">
+                <div class="stock-panel-heading">
+            <div><span class="feature-eyebrow">KEEP THE COFFEE FLOWING</span><h2>Stock watch</h2><p>A quick look at what needs a refill.</p></div>
+            <span class="stock-count"><?= count($lowStock) ?> low-stock <?= count($lowStock) === 1 ? 'item' : 'items' ?></span>
+        </div>
+        <div class="stock-list">
+        <?php if (!$lowStock): ?><p class="mb-0">All tracked products have healthy stock levels.</p><?php endif; ?>
+        <?php foreach ($lowStock as $item): ?>
+            <div class="stock-item">
+                <a class="stock-product" href="products.php?edit=<?= (int)$item['product_id'] ?>"><span class="stock-product-icon" aria-hidden="true">☕</span><span><?= h($item['name']) ?><small>View product &amp; restock</small></span></a>
+                <strong class="stock-status <?= (int)$item['stock'] <= 0 ? 'is-empty' : 'is-low' ?>"><?= (int)$item['stock'] <= 0 ? 'Sold out' : (int)$item['stock'] . ' left' ?></strong>
+            </div>
+        <?php endforeach; ?>
+        </div>
+        <p class="stock-hint">Alerts appear at 10 servings or fewer.</p>
+    </section>
 
     <?php show_flash(); ?>
 
