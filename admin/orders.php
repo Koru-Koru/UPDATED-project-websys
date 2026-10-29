@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare('UPDATE orders SET cash_received = ?, change_amount = ? WHERE order_id = ?');
             $stmt->bind_param('ssi', $cash, $change, $orderId);
             $stmt->execute();
+            record_admin_activity($conn, 'Cash payment', 'Order #' . $orderId, 'Received ₱' . $cash . '; change ₱' . $change);
             $conn->commit();
             set_flash("Cash payment saved for order #$orderId. Change: ₱$change.");
         } catch (Throwable $e) {
@@ -91,7 +92,25 @@ JOIN customers c ON c.customer_id = o.customer_id
 ORDER BY o.created_at DESC, o.order_id DESC
 ";
 
-$orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+$search = is_string($_GET['search'] ?? null) ? trim($_GET['search']) : '';
+$statusFilter = is_string($_GET['status'] ?? null) ? $_GET['status'] : '';
+$paymentFilter = is_string($_GET['payment'] ?? null) ? $_GET['payment'] : '';
+$reviewFilter = ($_GET['review'] ?? '') === 'Pending';
+$clauses = [];
+$params = [];
+if ($search !== '') {
+    $clauses[] = '(CAST(o.order_id AS CHAR) = ? OR c.full_name LIKE ? OR c.email LIKE ?)';
+    array_push($params, ltrim($search, '#'), '%' . $search . '%', '%' . $search . '%');
+}
+if (in_array($statusFilter, $allowedStatuses, true)) { $clauses[] = 'o.status = ?'; $params[] = $statusFilter; }
+if (in_array($paymentFilter, ['Cash', 'GCash', 'Maya', 'GoTyme'], true)) { $clauses[] = 'o.payment_method = ?'; $params[] = $paymentFilter; }
+if (($_GET['unpaid'] ?? '') === '1') $clauses[] = "o.payment_method = 'Cash' AND o.cash_received < o.total AND o.status <> 'Cancelled'";
+if ($reviewFilter) $clauses[] = "o.payment_method <> 'Cash' AND o.payment_review = 'Pending' AND o.status <> 'Cancelled'";
+if ($clauses) $sql = str_replace('ORDER BY o.created_at', 'WHERE ' . implode(' AND ', $clauses) . ' ORDER BY o.created_at', $sql);
+$stmt = $conn->prepare($sql);
+if ($params) $stmt->bind_param(str_repeat('s', count($params)), ...$params);
+$stmt->execute();
+$orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!doctype html>
@@ -110,28 +129,7 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 
 <body class="admin-page">
 
-<nav class="navbar navbar-dark admin-nav sticky-top shadow">
-    <div class="container">
-        <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
-            <img
-                src="../Bestcoffee.jpg"
-                alt="Philippines' Best Coffee logo"
-                width="38"
-                height="38"
-                class="rounded-circle bg-white"
-                style="object-fit: contain;"
-            >
-            <span>Philippines' Best Coffee Admin</span>
-        </a>
-
-        <div class="d-flex align-items-center gap-2">
-            <span class="navbar-text d-none d-md-inline">
-                Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
-            </span>
-            <?php account_theme_logout(); ?>
-        </div>
-    </div>
-</nav>
+<?php admin_navbar(); ?>
 
 <main class="container py-4">
 
@@ -149,6 +147,16 @@ $orders = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
     </div>
 
     <?php show_flash(); ?>
+    <form method="get" class="card admin-card card-body mb-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4"><label for="order-search" class="form-label">Order # or customer</label><input id="order-search" class="form-control" name="search" value="<?= h($search) ?>" placeholder="Search orders"></div>
+            <div class="col-md-3"><label for="order-status" class="form-label">Status</label><select id="order-status" name="status" class="form-select"><option value="">All statuses</option><?php foreach ($allowedStatuses as $option): ?><option <?= $statusFilter === $option ? 'selected' : '' ?>><?= h($option) ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-3"><label for="order-payment" class="form-label">Payment</label><select id="order-payment" name="payment" class="form-select"><option value="">All methods</option><?php foreach (['Cash', 'GCash', 'Maya', 'GoTyme'] as $option): ?><option <?= $paymentFilter === $option ? 'selected' : '' ?>><?= h($option) ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-2 d-flex gap-2"><button class="btn btn-coffee">Filter</button><a href="orders.php" class="btn btn-outline-coffee">Reset</a></div>
+            <div class="col-12"><label class="form-check"><input class="form-check-input" type="checkbox" name="unpaid" value="1" <?= ($_GET['unpaid'] ?? '') === '1' ? 'checked' : '' ?>> Awaiting cash payment only</label></div>
+            <div class="col-12"><label class="form-check"><input class="form-check-input" type="checkbox" name="review" value="Pending" <?= $reviewFilter ? 'checked' : '' ?>> Payment receipts awaiting review only</label></div>
+        </div>
+    </form>
 
     <div class="alert alert-info">
         Update each order as it progresses through preparation and fulfillment.

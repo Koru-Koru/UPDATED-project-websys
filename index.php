@@ -68,7 +68,7 @@ function render_products(array $items): void {
   <header class="site-header fixed-top shadow">
     <nav class="navbar navbar-expand-lg navbar-dark container px-3 px-lg-5 py-2">
       <a class="navbar-brand d-flex align-items-center text-white me-3" href="#home">
-        <img src="Bestcoffee.jpg" alt="Philippines' Coffee Logo" class="d-flex align-items-center gap-2" style="height: 38px; width: 38px; object-fit: contain; border-radius: 50%; background: #fff;">
+        <img src="assets/Bestcoffee.jpg" alt="Philippines' Coffee Logo" class="d-flex align-items-center gap-2" style="height: 38px; width: 38px; object-fit: contain; border-radius: 50%; background: #fff;">
         <span class="nav-brand-title"> Philippines' Best Coffee </span>
       </a>
 
@@ -227,7 +227,7 @@ function render_products(array $items): void {
   </aside>
   <div id="checkout-modal" class="cart-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title" aria-hidden="true">
     <div class="cart-content checkout-content">
-      <img class="checkout-brand-watermark" src="Bestcoffee.jpg" alt="" aria-hidden="true">
+      <img class="checkout-brand-watermark" src="assets/Bestcoffee.jpg" alt="" aria-hidden="true">
       <header class="overlay-header">
         <div>
           <p class="cart-eyebrow mb-1">Step 2 of 3 · Payment</p>
@@ -261,10 +261,10 @@ function render_products(array $items): void {
           <h4 class="checkout-section-title">Payment</h4>
 
           <section id="loyalty-program" class="loyalty-card mb-3" data-balance="<?= $loyaltyBalance ?>" data-rewards="<?= h(json_encode(loyalty_rewards($conn))) ?>" data-cup-ids="<?= h(json_encode(array_map('intval', array_column(array_filter($products, fn($p) => in_array($p['category'], ['Hot', 'Iced'], true) && (float)$p['price'] > 0), 'product_id')))) ?>">
-            <details id="checkout-rewards">
-            <summary class="rewards-summary">
+            <button type="button" class="rewards-summary w-100" data-bs-toggle="collapse" data-bs-target="#checkout-rewards" aria-expanded="false" aria-controls="checkout-rewards">
               <span><span class="feature-eyebrow mb-1">COFFEE REWARDS</span><span>Available points: <strong id="loyalty-balance"><?= $loyaltyBalance ?></strong></span></span>
-            </summary>
+            </button>
+            <div id="checkout-rewards" class="collapse">
             <div class="mt-3">
             <p id="loyalty-estimate" class="small text-secondary mb-2">Earn 1 point per Hot or Iced drink after fulfillment.</p>
             <label for="loyalty-reward" class="form-label">Choose your reward</label>
@@ -279,7 +279,7 @@ function render_products(array $items): void {
             <label class="d-flex align-items-center gap-2"><input type="checkbox" id="redeem-loyalty" <?= $loyaltyBalance < LOYALTY_REWARD_POINTS ? 'disabled' : '' ?>> <span>Apply selected reward</span></label>
             <p class="small text-secondary mt-2 mb-0">One reward per order. Cash rewards need a total above the discount amount. Mug and flask rewards are included with your order. Choose a reward or the Senior / PWD discount.</p>
             </div>
-            </details>
+            </div>
           </section>
           <div class="form-check form-switch discount-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="senior-pwd">

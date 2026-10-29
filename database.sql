@@ -489,3 +489,20 @@ WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Burnt Cheesecake' AND cat
 INSERT INTO products (name, category, description, price, image_url, is_available)
 SELECT 'Chocolate Pistachio Eclair','Snacks and Bites','A chocolate eclair filled with smooth cream and pistachio.',100,'assets/Pastries/Chocolatepistacioeclairs.webp',1
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Chocolate Pistachio Eclair' AND category = 'Snacks and Bites');
+
+CREATE TABLE IF NOT EXISTS merchandise_collections (
+    transaction_id INT PRIMARY KEY,
+    status ENUM('Waiting', 'Received') NOT NULL DEFAULT 'Waiting',
+    updated_by INT DEFAULT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES loyalty_transactions(transaction_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS admin_activity (
+    activity_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    action VARCHAR(80) NOT NULL,
+    target VARCHAR(120) NOT NULL,
+    details TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX activity_date (created_at)
+) ENGINE=InnoDB;

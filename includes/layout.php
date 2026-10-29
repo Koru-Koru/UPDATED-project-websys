@@ -18,11 +18,12 @@ function feature_page_start(string $title): void {
         <?php account_theme_assets(); ?>
     </head>
     <body class="account-body feature-page">
+    <?php if ($adminPage): admin_navbar(); else: ?>
     <header class="feature-nav">
         <div class="container">
             <a class="feature-brand" href="<?= h($home) ?>">
-                <img src="../Bestcoffee.jpg" alt="" width="42" height="42">
-                <span>Philippines’ Best Coffee<small><?= $adminPage ? 'ADMIN CORNER' : 'YOUR COFFEE CORNER' ?></small></span>
+                <img src="../assets/Bestcoffee.jpg" alt="" width="42" height="42">
+                <span>Philippines’ Best Coffee<small><?= $adminPage ? 'ADMIN' : 'YOUR COFFEE CORNER' ?></small></span>
             </a>
             <a class="feature-home" href="<?= h($home) ?>">
                 <?= $adminPage ? 'Dashboard' : 'Back to the menu' ?> <span aria-hidden="true">↗</span>
@@ -36,6 +37,7 @@ function feature_page_start(string $title): void {
             ?>
         </div>
     </header>
+    <?php endif; ?>
     <main class="container feature-main">
         <div class="feature-heading">
             <span class="feature-eyebrow"><?= $adminPage ? 'A little care behind every cup' : 'Made for your coffee moments' ?></span>

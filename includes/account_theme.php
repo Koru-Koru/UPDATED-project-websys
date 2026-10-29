@@ -19,3 +19,17 @@ function account_theme_logout(): void {
     account_theme_toggle();
     echo '<a href="logout.php" class="btn btn-sm btn-outline-light theme-logout">Log Out</a></div>';
 }
+
+function admin_navbar(): void {
+    ?>
+    <nav class="feature-nav admin-unified-nav" aria-label="Admin navigation">
+        <div class="container">
+            <a class="feature-brand" href="dashboard.php">
+                <img src="../assets/Bestcoffee.jpg" alt="Philippines' Best Coffee logo" width="42" height="42">
+                <span>Philippines’ Best Coffee<small>ADMIN</small></span>
+            </a>
+            <?php account_theme_logout(); ?>
+        </div>
+    </nav>
+    <?php
+}

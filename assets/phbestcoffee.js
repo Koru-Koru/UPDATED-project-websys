@@ -600,10 +600,6 @@ $(function () {
         $('#receipt-discount').text('−' + peso(totals.discount));
         $('#qr-amount').text(peso(totals.total));
 
-        updateCashFeedback();
-    }
-
-    function updateCashFeedback() {
         updateConfirmState();
     }
 
@@ -631,7 +627,6 @@ $(function () {
 
         if (!method) {
             $('#cash-panel, #qr-panel, #qr-note, #qr-confirm-row, #proof-upload').addClass('d-none');
-            $('#cash-amount').val('');
             resetProof();
         } else if (method === 'Cash') {
             $('#cash-panel').removeClass('d-none');
@@ -714,7 +709,7 @@ $(function () {
         selectPaymentMethod('');
 
         window.setTimeout(function () {
-            document.getElementById('cash-amount')?.focus();
+            document.querySelector('input[name="payment-method"]')?.focus();
         }, 180);
     }
 
@@ -843,8 +838,6 @@ $(function () {
             document.getElementById('pickup-at').focus();
             return;
         }
-        const totalCents = toCents(totals.total);
-        const cashCents = 0;
         const method = paymentMethods[paymentMethod];
         if (!method) {
             showCheckoutError('Choose a payment method.');
@@ -975,12 +968,12 @@ $(function () {
         const $summary = $('#confirmation-body').empty();
         const $receipt = $('<section class="receipt-preview"></section>');
         const $watermark = $('<img class="receipt-watermark" alt="" aria-hidden="true">')
-            .attr('src', new URL('Bestcoffee.jpg', window.location.href).href);
+            .attr('src', new URL('assets/Bestcoffee.jpg', window.location.href).href);
         const $content = $('<div class="receipt-preview-content"></div>');
         const $brand = $('<header class="receipt-brand"></header>');
 
         $('<img class="receipt-brand-logo" alt="Philippines’ Best Coffee logo">')
-            .attr('src', new URL('Bestcoffee.jpg', window.location.href).href)
+            .attr('src', new URL('assets/Bestcoffee.jpg', window.location.href).href)
             .appendTo($brand);
         $('<h3 class="title-font"></h3>')
             .text("Philippines' Best Coffee")
@@ -1058,8 +1051,6 @@ $(function () {
 
         $('#checkout-modal').removeClass('is-open').attr('aria-hidden', 'true');
         resetCheckoutFields();
-        $('#cash-feedback').removeClass('is-ok is-short').addClass('is-hint')
-            .text('Enter the cash handed over to compute change.');
         hideCheckoutError();
 
         $confirmation.addClass('is-open').attr('aria-hidden', 'false');

@@ -62,6 +62,23 @@ REWARD STOCK
   cancelled orders restore their reserved item once. Existing stock is not reset
   when database.sql is imported again.
 
+ADMIN WORKFLOW AND BACKUPS
+- Cash orders must have their full payment recorded before Served, Delivered,
+  or Completed. Record the amount received in Admin > Order Management.
+- Order Management supports order/customer search, status and payment filters,
+  and an awaiting-cash filter.
+- Merchandise collection requires confirmation and records the releasing admin.
+- Dashboard shortcuts include Admin activity and Database backup.
+- Admin activity begins when this feature is installed; older changes cannot
+  be reconstructed. The database.sql import creates the activity table.
+- Download a database backup before major changes and at the end of each day.
+  Downloads are manual, not automatically scheduled. Store SQL files privately.
+- Copy uploads and assets separately to preserve receipt and product images.
+- Restore SQL into a separate empty database with phpMyAdmin, verify it, then
+  change includes/db.php to use it. Restoring replaces tables in the target DB.
+- Run PHP tests/admin_workflow.php to verify cash payment rules and a full
+  database export/restore using a disposable test database.
+
 CODE ORGANIZATION
 - includes/layout.php: shared page headers and footers.
 - includes/account_theme.php: theme assets and the switch beside Log Out.
@@ -69,6 +86,11 @@ CODE ORGANIZATION
 - includes/loyalty.php: points rules, balances, awards, redemptions, and refunds.
 - includes/order_features.php: order status changes, stock restoration, reset tokens.
 - assets/order-progress.js: customer order tracking updates.
+- assets/admin-products.js: product picker and bulk stock selection.
+- assets/admin-merchandise.js: merchandise collection confirmation.
+- assets/customer-rewards.js: customer reward confirmation form.
+- includes/admin_activity.php: shared admin activity recording.
+- includes/database_backup.php: consistent SQL database export.
 
 UPLOADS
 - JPG, PNG, and WebP photos up to 5 MB.

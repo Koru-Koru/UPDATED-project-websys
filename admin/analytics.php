@@ -160,27 +160,7 @@ $topValues = array_map('intval', array_column($topProducts, 'quantity_sold'));
 
 <body class="admin-page">
 
-<nav class="navbar navbar-dark admin-nav sticky-top shadow">
-    <div class="container">
-        <div class="d-flex align-items-center gap-2">
-            <img
-                src="../assets/Bestcoffee.jpg"
-                alt="Philippines' Best Coffee logo"
-                style="height:38px;width:38px;object-fit:contain;border-radius:50%;background:#fff;"
-            >
-            <a class="navbar-brand mb-0" href="dashboard.php">
-                Philippines' Best Coffee Admin
-            </a>
-        </div>
-
-        <div class="d-flex align-items-center gap-2">
-            <span class="navbar-text d-none d-md-inline">
-                Hi, <?= h($_SESSION['admin_username'] ?? 'Admin') ?>
-            </span>
-            <?php account_theme_logout(); ?>
-        </div>
-    </div>
-</nav>
+<?php admin_navbar(); ?>
 
 <main class="container py-4">
 

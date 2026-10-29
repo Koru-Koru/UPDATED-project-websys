@@ -3,6 +3,30 @@ require_once __DIR__ . '/../includes/customer_auth.php';
 
 require_customer();
 require_once __DIR__ . '/../includes/loyalty.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
+    try {
+        $rewardId = is_string($_POST['reward_id'] ?? null) ? $_POST['reward_id'] : '';
+        $reward = loyalty_rewards($conn)[$rewardId] ?? null;
+        $nonce = $_POST['redemption_token'] ?? '';
+        if (!$reward || empty($reward['image']) || ($_POST['accept_reward'] ?? '') !== '1' || !is_string($nonce) || !hash_equals($_SESSION['redemption_token'] ?? '', $nonce) || $nonce === '') {
+            throw new RuntimeException('Please reopen the reward and confirm your selection.');
+        }
+        $redemptionId = redeem_merchandise($conn, (int)$_SESSION['customer_id'], $rewardId);
+        unset($_SESSION['redemption_token']);
+        set_flash("Merchandise order #M-$redemptionId confirmed. {$reward['points']} points deducted. Show this number at the counter to collect your {$reward['label']}.");
+    } catch (Throwable $e) {
+        set_flash($e instanceof mysqli_sql_exception ? 'Unable to redeem your reward. Please try again.' : $e->getMessage(), 'danger');
+    }
+    header('Location: profile.php');
+    exit;
+}
+$_SESSION['redemption_token'] ??= bin2hex(random_bytes(32));
+ensure_merchandise_collection_table($conn);
+$merchandise = $conn->prepare("SELECT t.transaction_id, t.reason, t.points, t.created_at, COALESCE(m.status, 'Waiting') AS collection_status FROM loyalty_transactions t LEFT JOIN merchandise_collections m ON m.transaction_id = t.transaction_id WHERE customer_id = ? AND kind = 'Redeem' AND order_id IS NULL AND reason LIKE 'Merchandise: %' ORDER BY t.transaction_id DESC LIMIT 20");
+$merchandise->bind_param('i', $_SESSION['customer_id']);
+$merchandise->execute();
+$merchandiseOrders = $merchandise->get_result()->fetch_all(MYSQLI_ASSOC);
 $pointsBalance = loyalty_balance($conn, (int)$_SESSION['customer_id']);
 $rewards = loyalty_rewards($conn);
 $nextReward = end($rewards);
@@ -100,7 +124,7 @@ $favorites = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             href="../index.php"
         >
             <img
-                src="../Bestcoffee.jpg"
+                src="../assets/Bestcoffee.jpg"
                 alt="Philippines' Best Coffee logo"
             >
             <span>Philippines' Best Coffee</span>
@@ -171,7 +195,11 @@ $favorites = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                                 <small><?= ($reward['stock'] ?? null) === 0 ? 'Currently unavailable' : ($ready ? 'Ready to redeem' : ($reward['points'] - $pointsBalance) . ' points to go') ?></small>
                             </div>
                             <?php if ($ready): ?>
+                                <?php if (!empty($reward['image'])): ?>
+                                <button type="button" class="btn btn-outline-coffee btn-sm" data-bs-toggle="modal" data-bs-target="#redeem-counter-modal" data-reward-id="<?= (int)$reward['points'] ?>" data-reward="<?= h($reward['label']) ?>" data-points="<?= (int)$reward['points'] ?>" data-image="../<?= h($reward['image']) ?>">Redeem</button>
+                                <?php else: ?>
                                 <a href="../index.php#menu" class="btn btn-outline-coffee btn-sm" aria-label="<?= h('Order and redeem ' . $reward['label']) ?>">Redeem</a>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <button type="button" class="btn btn-outline-coffee btn-sm" disabled>Redeem</button>
                             <?php endif; ?>
@@ -181,6 +209,15 @@ $favorites = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 <?php endforeach; ?>
             </div>
             <p class="small text-secondary mt-3 mb-0">*Order total must exceed the coupon discount. Apply your reward at checkout.</p>
+            <?php if ($merchandiseOrders): ?>
+                <div class="mt-3">
+                    <h3 class="h6">Your merchandise orders</h3>
+                    <p class="small text-secondary">Show your merchandise order number at the counter.</p>
+                    <?php foreach ($merchandiseOrders as $merchOrder): ?>
+                        <div class="border rounded p-3 mb-2"><strong>#M-<?= (int)$merchOrder['transaction_id'] ?></strong> <span class="badge <?= $merchOrder['collection_status'] === 'Received' ? 'text-bg-success' : 'text-bg-warning' ?>">Collection: <?= h($merchOrder['collection_status']) ?></span> · <?= h(substr($merchOrder['reason'], strlen('Merchandise: '))) ?> <span class="small text-secondary">· <?= abs((int)$merchOrder['points']) ?> points redeemed · <?= h($merchOrder['created_at']) ?></span></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
             <details class="mt-3"><summary class="fw-semibold">Points history (latest 20)</summary>
                 <?php if (!$pointsHistory): ?><p class="text-secondary mt-2 mb-0">Your points history will appear after your first fulfilled order.</p><?php else: ?>
                 <div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>Date</th><th>Order</th><th>Activity</th><th>Points</th></tr></thead><tbody>
@@ -377,5 +414,39 @@ $favorites = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 </main>
 
+<div class="modal fade" id="redeem-counter-modal" tabindex="-1" aria-labelledby="redeem-counter-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" id="merchandise-redemption-form" class="modal-content account-card">
+            <?= csrf_field() ?>
+            <input type="hidden" name="redemption_token" value="<?= h($_SESSION['redemption_token']) ?>">
+            <input type="hidden" name="reward_id" id="redemption-reward-id">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="redeem-counter-title">Confirm your reward</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <img id="counter-reward-image" class="reward-product-image" alt="">
+                    <div><strong id="counter-reward-name"></strong><p class="text-secondary mb-0"><span id="counter-reward-points"></span> points required</p></div>
+                </div>
+                <div id="reward-confirm-step">
+                    <p>Would you like to redeem this product?</p>
+                    <div class="form-check">
+                        <input type="checkbox" id="accept-reward" name="accept_reward" value="1" class="form-check-input" required>
+                        <label for="accept-reward" class="form-check-label">Yes, I want this reward and understand the required points.</label>
+                    </div>
+                </div>
+                <p class="small text-secondary mt-3 mb-0">Accepting deducts the required points and reserves one item. You will receive a merchandise order number to show at the counter.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="reward-cancel" class="btn btn-outline-coffee" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" id="reward-accept-btn" class="btn btn-coffee" disabled>Accept &amp; redeem</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../assets/customer-rewards.js?v=<?= filemtime(__DIR__ . '/../assets/customer-rewards.js') ?>"></script>
 </body>
 </html>

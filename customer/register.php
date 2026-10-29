@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="text-center mb-4">
             <a href="../index.php">
                 <img
-                    src="../Bestcoffee.jpg"
+                    src="../assets/Bestcoffee.jpg"
                     alt="Philippines' Best Coffee logo"
                     class="brand-logo"
                 >

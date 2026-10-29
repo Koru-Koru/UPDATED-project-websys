@@ -37,6 +37,10 @@ function update_order_status(mysqli $conn, int $id, string $status): void {
             $conn->commit();
             return;
         }
+        if ($order['payment_method'] === 'Cash' && in_array($status, ['Served', 'Delivered', 'Completed'], true)
+            && (int)round((float)$order['cash_received'] * 100) < (int)round((float)$order['total'] * 100)) {
+            throw new RuntimeException('Record the full cash payment in Order Management before marking this order served, delivered, or completed.');
+        }
         if ($status !== 'Cancelled' && (
             ($order['payment_method'] !== 'Cash' && $order['payment_review'] !== 'Approved') ||
             ($order['id_review'] !== 'Not required' && $order['id_review'] !== 'Approved')
@@ -68,6 +72,7 @@ function update_order_status(mysqli $conn, int $id, string $status): void {
         $stmt = $conn->prepare('INSERT INTO order_status_history (order_id, status) VALUES (?, ?)');
         $stmt->bind_param('is', $id, $status);
         $stmt->execute();
+        record_admin_activity($conn, 'Order status', 'Order #' . $id, $order['status'] . ' → ' . $status);
         $conn->commit();
     } catch (Throwable $e) {
         $conn->rollback();

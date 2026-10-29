@@ -1,5 +1,6 @@
 <?php
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+require_once __DIR__ . '/admin_activity.php';
 
 $host = 'localhost';
 $dbname = 'phbestcoffee_db';

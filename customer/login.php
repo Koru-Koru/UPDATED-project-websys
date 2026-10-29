@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="text-center mb-3">
                 <a href="../index.php">
-                    <img src="../Bestcoffee.jpg"
+                    <img src="../assets/Bestcoffee.jpg"
                          alt="Philippines' Best Coffee logo"
                          class="brand-logo">
                 </a>

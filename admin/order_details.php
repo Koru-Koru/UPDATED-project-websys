@@ -82,16 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body class="admin-page">
-    <nav class="navbar navbar-dark admin-nav">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
-                <img src="../Bestcoffee.jpg" alt="Logo" width="38" height="38"
-                     class="rounded-circle bg-white" style="object-fit:contain;">
-                <span>Philippines' Best Coffee Admin</span>
-            </a>
-            <?php account_theme_logout(); ?>
-        </div>
-    </nav>
+    <?php admin_navbar(); ?>
 
     <main class="container py-4">
 

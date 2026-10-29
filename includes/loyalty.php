@@ -2,6 +2,16 @@
 
 const LOYALTY_REWARD_POINTS = 10;
 
+function ensure_merchandise_collection_table(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS merchandise_collections (
+        transaction_id INT PRIMARY KEY,
+        status ENUM('Waiting', 'Received') NOT NULL DEFAULT 'Waiting',
+        updated_by INT DEFAULT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (transaction_id) REFERENCES loyalty_transactions(transaction_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB");
+}
+
 function loyalty_rewards(?mysqli $conn = null): array {
     $rewards = [
         '5' => ['points' => 5, 'cents' => 2000, 'label' => '₱20 off'],
@@ -106,6 +116,7 @@ function loyalty_adjust(mysqli $conn, int $customerId, int $adminId, int $points
         $stmt = $conn->prepare("INSERT INTO loyalty_transactions (customer_id, kind, points, reason, admin_id) VALUES (?, 'Adjust', ?, ?, ?)");
         $stmt->bind_param('iisi', $customerId, $points, $reason, $adminId);
         $stmt->execute();
+        record_admin_activity($conn, 'Points adjustment', 'Customer #' . $customerId, $points . ' points: ' . $reason);
         $conn->commit();
     } catch (Throwable $e) {
         $conn->rollback();
@@ -127,4 +138,31 @@ function loyalty_reserve_stock(mysqli $conn, string $rewardId): ?string {
     $stmt->bind_param('s', $rewardId);
     $stmt->execute();
     return $rewardId;
+}
+
+function redeem_merchandise(mysqli $conn, int $customerId, string $rewardId): int {
+    $reward = loyalty_rewards($conn)[$rewardId] ?? null;
+    if (!$reward || empty($reward['image'])) {
+        throw new RuntimeException('Choose a valid merchandise reward.');
+    }
+
+    $conn->begin_transaction();
+    try {
+        loyalty_lock_customer($conn, $customerId);
+        if (loyalty_balance($conn, $customerId) < $reward['points']) {
+            throw new RuntimeException('You do not have enough points for this reward.');
+        }
+        loyalty_reserve_stock($conn, $rewardId);
+        $points = -$reward['points'];
+        $reason = 'Merchandise: ' . $reward['label'];
+        $stmt = $conn->prepare("INSERT INTO loyalty_transactions (customer_id, kind, points, reason) VALUES (?, 'Redeem', ?, ?)");
+        $stmt->bind_param('iis', $customerId, $points, $reason);
+        $stmt->execute();
+        $redemptionId = $conn->insert_id;
+        $conn->commit();
+        return $redemptionId;
+    } catch (Throwable $e) {
+        $conn->rollback();
+        throw $e;
+    }
 }
