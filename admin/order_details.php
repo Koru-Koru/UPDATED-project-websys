@@ -214,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             <div class="d-flex justify-content-between gap-3 mb-2">
                                 <span>Payment Method</span>
-                                <strong><?= h($paymentMethod) ?></strong>
+                                <strong><?= h(order_payment_label($order)) ?></strong>
                             </div>
 
                             <?php if ($order['id_review'] !== 'Not required'): ?>

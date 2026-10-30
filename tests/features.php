@@ -72,6 +72,8 @@ try {
     $response = request('/orders/create.php', ['csrf_token' => $checkoutToken, 'payload' => json_encode($delivery)]);
     check($response['status'] === 400, 'Delivery rejects an oversized address');
     $delivery['delivery_address'] = "123 Test Street\nBarangay Test, Manila";
+    $delivery['delivery_address_parts'] = ['street' => '123 Test Street', 'barangay' => 'Barangay Test', 'city' => 'Manila', 'province' => 'Metro Manila'];
+    $delivery['delivery_address'] = '123 Test Street, Barangay Test, Manila, Metro Manila';
     $response = request('/orders/create.php', ['csrf_token' => $checkoutToken, 'payload' => json_encode($delivery)]);
     $deliveryOrder = json_decode($response['body'], true);
     check($response['status'] === 200 && !empty($deliveryOrder['order_id']), 'Delivery checkout succeeds');
@@ -82,6 +84,7 @@ try {
     check(str_contains($page['body'], '123 Test Street'), 'Admin can see delivery address');
     $page = request('/customer/order_detail.php?id=' . $deliveryId);
     check(str_contains($page['body'], '123 Test Street'), 'Customer can see delivery address');
+    check(str_contains($page['body'], 'Cash on delivery (COD)'), 'Customer delivery order shows COD');
     update_order_status($conn, $deliveryId, 'Cancelled');
     $response = request('/orders/create.php', ['csrf_token' => $checkoutToken, 'payload' => json_encode($payload)]);
     $order = json_decode($response['body'], true); $orderId = (int)($order['order_id'] ?? 0);

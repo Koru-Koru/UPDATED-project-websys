@@ -261,7 +261,7 @@ $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                                             <?php endif; ?>
                                         </div>
                                         <div class="small text-secondary mt-1">
-                                            <?= h($order['payment_method'] ?? 'Cash') ?>
+                                            <?= h(order_payment_label($order)) ?>
                                         </div>
                                     </td>
 

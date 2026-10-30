@@ -649,9 +649,17 @@ body.account-body {
 }
 
 .menu-quantity-input {
+    -moz-appearance: textfield;
+    appearance: textfield;
     border-color: #ddcfc2;
     border-radius: .55rem;
     font-weight: 600;
+}
+
+.menu-quantity-input::-webkit-inner-spin-button,
+.menu-quantity-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .menu-quantity-input:focus {
@@ -2151,6 +2159,13 @@ body.cart-scroll-lock {
 /* Account tools */
 .feature-page { background: radial-gradient(ellipse at top right, #eee1d0 0, transparent 48%), var(--cream); min-height: 100vh; }
 .feature-nav { background: #fffdf9; border-bottom: 1px solid var(--border); }
+@media screen {
+    .admin-unified-nav {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+    }
+}
 .feature-nav > .container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
 .feature-brand { display: inline-flex; align-items: center; gap: .8rem; color: var(--coffee); text-decoration: none; font-weight: 700; }
 .feature-brand img { object-fit: contain; border-radius: 50%; background: #f5ece2; }

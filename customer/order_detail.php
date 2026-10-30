@@ -153,7 +153,7 @@ if ($isCashPayment) {
             <div class="ms-auto w-100" style="max-width: 320px;">
                 <div class="d-flex justify-content-between gap-3 mb-2">
                     <span>Payment method</span>
-                    <strong><?= h($paymentMethod) ?></strong>
+                    <strong><?= h(order_payment_label($order)) ?></strong>
                 </div>
                 <?php foreach ($paymentDetails as $label => $key): ?>
                     <div class="d-flex justify-content-between gap-3 mb-2">

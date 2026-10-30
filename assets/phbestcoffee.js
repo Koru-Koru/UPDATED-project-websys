@@ -582,7 +582,9 @@ $(function () {
     }
 
     function confirmLabel() {
-        return paymentMethod === 'Cash' ? 'Place order · Pay at counter' : 'Place order';
+        return paymentMethod === 'Cash'
+            ? (fulfillmentMethod() === 'Delivery' ? 'Place order · Cash on delivery' : 'Place order · Pay at counter')
+            : 'Place order';
     }
 
     function refreshCheckoutTotals() {
@@ -757,6 +759,14 @@ $(function () {
         $('#pickup-time-panel').toggleClass('d-none', delivery);
         syncPickupTiming();
         if (delivery) $('#pickup-at').val('');
+        const $cashOption = $('input[name="payment-method"][value="Cash"]').closest('.payment-method');
+        $cashOption.find('.payment-method-name').text(delivery ? 'COD' : 'Cash');
+        $cashOption.find('.payment-method-note').text(delivery ? 'Pay the rider upon delivery' : 'Pay at the counter');
+        $('#cash-panel .cash-feedback').empty()
+            .append($('<strong class="d-block mb-1"></strong>').text(delivery ? 'Pay in cash when your order arrives.' : 'Please proceed to the counter to pay.'))
+            .append(document.createTextNode(delivery ? 'Place your order, then pay the rider upon delivery.' : 'Place your order, then show your order number to the cashier and pay in cash.'))
+            .append($('<span class="d-block mt-2 small"></span>').text('Your order number will appear after you place the order.'));
+        $('#confirm-payment-btn').text(confirmLabel());
     });
     $('#loyalty-reward').on('change', function () {
         const reward = selectedReward();
@@ -965,6 +975,8 @@ $(function () {
     });
 
     function completeOrder(orderId, totals, cash, change, method) {
+        const cashOnDelivery = method === 'Cash' && fulfillmentMethod() === 'Delivery';
+        $('#cash-order-number-panel p').text(cashOnDelivery ? 'Keep this order number and pay the rider in cash upon delivery.' : 'Please show this number at the counter and pay in cash.');
         const $ongoing = $('#ongoing-order-indicator');
         const ongoingCount = (Number($ongoing.attr('data-count')) || 0) + 1;
         $ongoing.attr('data-count', ongoingCount).text('You have ' + ongoingCount + ' ongoing order' + (ongoingCount === 1 ? '' : 's'));
@@ -1027,6 +1039,8 @@ $(function () {
         appendTotal('Total', peso(totals.total), 'receipt-grand-total');
 
         if (method === 'Cash') {
+            appendTotal('Payment method', cashOnDelivery ? 'Cash on delivery (COD)' : 'Cash');
+            if (cashOnDelivery) appendTotal('Amount due on delivery', peso(totals.total));
             appendTotal('Cash received', peso(cash));
             appendTotal('Change', peso(change));
         } else {
@@ -1046,7 +1060,7 @@ $(function () {
         $summary.append($receipt);
         $('#confirmation-message').text(
             method === 'Cash'
-                ? 'Order #' + orderId + ' has been saved to your account. Please pay at the counter.'
+                ? 'Order #' + orderId + (cashOnDelivery ? ' has been saved to your account. Please pay the rider in cash upon delivery.' : ' has been saved to your account. Please pay at the counter.')
                 : 'Order #' + orderId + ' has been saved · payment received via ' + method + '.'
         );
 

@@ -9,6 +9,12 @@ function h($value): string {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+function order_payment_label(array $order): string {
+    $method = $order['payment_method'] ?? 'Cash';
+    return $method === 'Cash' && ($order['fulfillment_method'] ?? 'Pickup') === 'Delivery'
+        ? 'Cash on delivery (COD)' : $method;
+}
+
 function require_admin(): void {
     if (empty($_SESSION['admin_id'])) {
         header('Location: login.php');
